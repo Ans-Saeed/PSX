@@ -1,4 +1,3 @@
-
 // ================= CONFIG =================
 const PSX_BASE = "https://dps.psx.com.pk/timeseries/eod";
 
@@ -6,6 +5,13 @@ const FUNDAMENTALS = {
   OGDC: { pe: 4.2, eps: 32, divY: 12, roe: 28 },
   HBL: { pe: 5.1, eps: 28, divY: 10, roe: 22 },
   ENGRO: { pe: 6.5, eps: 35, divY: 8, roe: 30 },
+  LUCK: { pe: 8.2, eps: 42, divY: 6, roe: 18 },
+  FCCL: { pe: 5.8, eps: 15, divY: 9, roe: 20 },
+  MCB: { pe: 4.5, eps: 38, divY: 11, roe: 25 },
+  UBL: { pe: 5.3, eps: 30, divY: 10, roe: 21 },
+  PPL: { pe: 4.8, eps: 28, divY: 13, roe: 24 },
+  PSO: { pe: 6.1, eps: 45, divY: 14, roe: 26 },
+  MARI: { pe: 7.2, eps: 55, divY: 7, roe: 22 },
 };
 
 // Benchmarks
@@ -22,14 +28,17 @@ function qs(ticker) {
   document.getElementById('stockInput').value = ticker;
   analyzeStock();
 }
+
 // ================= MAIN =================
 async function analyzeStock() {
   const raw = document.getElementById('stockInput').value.trim().toUpperCase();
   if (!raw) return;
 
   showLoading();
+  updateLoaderStep(1);
 
   try {
+    // Use your Vercel API route
     const res = await fetch(`/api/psx?symbol=${raw}`);
     const json = await res.json();
 
@@ -37,7 +46,16 @@ async function analyzeStock() {
       throw new Error("Ticker not found or insufficient data");
     }
 
-    const data = json.data;
+    updateLoaderStep(2);
+
+    // ===== FIX: Map flat array [timestamp, close, volume, open] to objects =====
+    const data = json.data.map(row => ({
+      timestamp: row[0],
+      close: row[1],
+      volume: row[2],
+      open: row[3]
+    }));
+
     const latest = data[data.length - 1];
     const prev = data[data.length - 2];
 
@@ -56,6 +74,8 @@ async function analyzeStock() {
     const w52H = Math.max(...prices);
     const w52L = Math.min(...prices);
     const pct52 = ((price - w52L) / (w52H - w52L)) * 100;
+
+    updateLoaderStep(3);
 
     // ===== FUNDAMENTALS =====
     const f = FUNDAMENTALS[raw] || {};
@@ -109,50 +129,136 @@ async function analyzeStock() {
       confidence = 65;
     }
 
+    updateLoaderStep(4);
+
     // ===== RENDER =====
     const html = `
       <div class="stock-header">
-        <div>
+        <div class="stock-name-block">
           <h2>PSX:${raw}</h2>
+          <div class="company-name">Lucky Cement Limited</div>
           <div class="data-note">⟳ Live via PSX</div>
         </div>
-        <div>
+        <div class="price-block">
           <div class="current-price">PKR ${f2(price)}</div>
           <div class="price-change ${chgAbs >= 0 ? 'up' : 'dn'}">
-            ${sign(chgAbs)}${f2(chgAbs)} (${f2(chgPct)}%)
+            ${sign(chgAbs)}${f2(chgAbs)} (${sign(chgPct)}${f2(chgPct)}%)
           </div>
         </div>
       </div>
 
       <div class="range-section">
-        <div>52W Range</div>
-        <div>${f2(w52L)} → ${f2(w52H)}</div>
+        <div class="range-label">52 Week Range</div>
+        <div class="range-bar-wrap">
+          <div class="range-val low">PKR ${f2(w52L)}</div>
+          <div class="range-bar">
+            <div class="range-fill" style="width:${Math.max(0, Math.min(100, pct52))}%"></div>
+            <div class="range-marker" style="left:${Math.max(0, Math.min(100, pct52))}%"></div>
+          </div>
+          <div class="range-val high">PKR ${f2(w52H)}</div>
+        </div>
       </div>
 
       <div class="metrics-grid">
         <div class="metric-card">
-          <div class="metric-label">P/E</div>
+          <div class="metric-label">P/E Ratio</div>
           <div class="metric-value">${pe ?? 'N/A'}</div>
+          <div class="metric-explain">Price to Earnings</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">EPS</div>
           <div class="metric-value">${eps ?? 'N/A'}</div>
+          <div class="metric-explain">Earnings Per Share</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Dividend</div>
+          <div class="metric-label">Dividend Yield</div>
           <div class="metric-value">${divY}%</div>
+          <div class="metric-explain">Annual Dividend Return</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Volume</div>
           <div class="metric-value">${fmtVol(volume)}</div>
+          <div class="metric-explain">Today's Shares Traded</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Day Open</div>
+          <div class="metric-value">${f2(latest.open)}</div>
+          <div class="metric-explain">Opening Price</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">52W Position</div>
+          <div class="metric-value">${f2(pct52)}%</div>
+          <div class="metric-explain">Relative to yearly range</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Fundamental Analysis</div>
+        <div class="fund-grid">
+          <div class="fund-card">
+            <div class="fund-card-label">Valuation</div>
+            <div class="fund-card-value">${pe ? (pe < PSX_AVG_PE ? 'Undervalued' : 'Fair/High') : 'N/A'}</div>
+            <div class="fund-card-note">P/E of ${pe ?? '?'} vs market avg ${PSX_AVG_PE}</div>
+          </div>
+          <div class="fund-card">
+            <div class="fund-card-label">Profitability</div>
+            <div class="fund-card-value">${roe ? (roe > PK_RATE ? 'Strong' : 'Moderate') : 'N/A'}</div>
+            <div class="fund-card-note">ROE of ${roe ?? '?'}% vs risk-free ${PK_RATE}%</div>
+          </div>
+          <div class="fund-card">
+            <div class="fund-card-label">Income</div>
+            <div class="fund-card-value">${divY > 10 ? 'Attractive' : divY > 5 ? 'Moderate' : 'Low'}</div>
+            <div class="fund-card-note">Dividend yield ${divY}% annual return</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Price Projections</div>
+        <div class="projection-grid">
+          <div class="proj-card bear">
+            <div class="proj-label">Bear Case</div>
+            <div class="proj-price">PKR ${f2(w52L * 0.95)}</div>
+            <div class="proj-return dn">${f2(((w52L * 0.95 - price) / price) * 100)}%</div>
+            <div class="proj-note">5% below 52-week low</div>
+          </div>
+          <div class="proj-card base">
+            <div class="proj-label">Base Case</div>
+            <div class="proj-price">PKR ${f2((w52H + w52L) / 2)}</div>
+            <div class="proj-return ${((w52H + w52L) / 2 - price) >= 0 ? 'up' : 'dn'}">${f2((((w52H + w52L) / 2 - price) / price) * 100)}%</div>
+            <div class="proj-note">Midpoint of 52-week range</div>
+          </div>
+          <div class="proj-card bull">
+            <div class="proj-label">Bull Case</div>
+            <div class="proj-price">PKR ${f2(w52H * 1.05)}</div>
+            <div class="proj-return up">${f2(((w52H * 1.05 - price) / price) * 100)}%</div>
+            <div class="proj-note">5% above 52-week high</div>
+          </div>
         </div>
       </div>
 
       <div class="verdict-card ${verdict.toLowerCase()}">
-        <div class="verdict-stamp">${verdict}</div>
-        <div>Confidence: ${confidence}%</div>
-        <div>
-          ${checklist.map(c => `<div>${c.status === 'pass' ? '✓' : '⚠'} ${c.label}</div>`).join('')}
+        <div class="verdict-inner">
+          <div class="verdict-stamp">${verdict}</div>
+          <div class="verdict-details">
+            <div class="verdict-confidence">Confidence Level</div>
+            <div class="confidence-bar">
+              <div class="confidence-fill" style="width:${confidence}%"></div>
+            </div>
+            <div class="verdict-reasoning">
+              ${verdict === 'BUY' ? 'Stock appears undervalued with strong fundamentals relative to market benchmarks.' :
+                verdict === 'HOLD' ? 'Stock is fairly valued. Consider holding current positions while monitoring for better entry points.' :
+                'Stock may be overvalued or showing weak fundamentals. Consider reducing exposure.'}
+            </div>
+            <div class="checklist">
+              ${checklist.map(c => `
+                <div class="check-item">
+                  <span class="check-icon ${c.status}">${c.status === 'pass' ? '✓' : c.status === 'fail' ? '✕' : '◐'}</span>
+                  <span>${c.label}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -163,6 +269,13 @@ async function analyzeStock() {
     el.innerHTML = html;
     el.style.display = 'block';
 
+    // Trigger animations after render
+    setTimeout(() => {
+      document.querySelectorAll('.range-fill, .range-marker, .confidence-fill').forEach(el => {
+        el.style.width = el.style.width; // force reflow
+      });
+    }, 50);
+
   } catch (err) {
     showError(err.message);
   }
@@ -172,6 +285,14 @@ async function analyzeStock() {
 function showLoading() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('results').style.display = 'none';
+  document.getElementById('error').style.display = 'none';
+  document.querySelectorAll('.loader-step').forEach(s => s.classList.remove('active'));
+}
+
+function updateLoaderStep(step) {
+  document.querySelectorAll('.loader-step').forEach((s, i) => {
+    s.classList.toggle('active', i < step);
+  });
 }
 
 function hideLoading() {
@@ -183,3 +304,8 @@ function showError(msg) {
   document.getElementById('errorMsg').innerText = msg;
   document.getElementById('error').style.display = 'block';
 }
+
+// Enter key support
+document.getElementById('stockInput')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') analyzeStock();
+});

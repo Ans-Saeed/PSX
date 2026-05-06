@@ -2,13 +2,10 @@
 // ================= CONFIG =================
 const PSX_BASE = "https://dps.psx.com.pk/timeseries/eod";
 
-// Example fundamentals (expand this gradually)
 const FUNDAMENTALS = {
   OGDC: { pe: 4.2, eps: 32, divY: 12, roe: 28 },
   HBL: { pe: 5.1, eps: 28, divY: 10, roe: 22 },
   ENGRO: { pe: 6.5, eps: 35, divY: 8, roe: 30 },
-  FCCL: { pe: 7.2, eps: 5.5, divY: 4, roe: 18 },
-  PPL: { pe: 3.8, eps: 40, divY: 14, roe: 32 },
 };
 
 // Benchmarks
@@ -33,7 +30,7 @@ async function analyzeStock() {
   showLoading();
 
   try {
-    const    fetch(`/api/psx?symbol=${raw}`)
+    const res = await fetch(`/api/psx?symbol=${raw}`);
     const json = await res.json();
 
     if (!json?.data || json.data.length < 2) {

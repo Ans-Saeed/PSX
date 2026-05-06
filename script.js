@@ -1,17 +1,16 @@
 // ================= CONFIG =================
-const PSX_BASE = "https://dps.psx.com.pk/timeseries/eod";
-
 const FUNDAMENTALS = {
-  OGDC: { pe: 4.2, eps: 32, divY: 12, roe: 28 },
-  HBL: { pe: 5.1, eps: 28, divY: 10, roe: 22 },
-  ENGRO: { pe: 6.5, eps: 35, divY: 8, roe: 30 },
-  LUCK: { pe: 8.2, eps: 42, divY: 6, roe: 18 },
-  FCCL: { pe: 5.8, eps: 15, divY: 9, roe: 20 },
-  MCB: { pe: 4.5, eps: 38, divY: 11, roe: 25 },
-  UBL: { pe: 5.3, eps: 30, divY: 10, roe: 21 },
-  PPL: { pe: 4.8, eps: 28, divY: 13, roe: 24 },
-  PSO: { pe: 6.1, eps: 45, divY: 14, roe: 26 },
-  MARI: { pe: 7.2, eps: 55, divY: 7, roe: 22 },
+  OGDC: { pe: 4.2, eps: 32, divY: 12, roe: 28, name: "Oil & Gas Development Company" },
+  HBL: { pe: 5.1, eps: 28, divY: 10, roe: 22, name: "Habib Bank Limited" },
+  ENGRO: { pe: 6.5, eps: 35, divY: 8, roe: 30, name: "Engro Corporation" },
+  LUCK: { pe: 8.2, eps: 42, divY: 6, roe: 18, name: "Lucky Cement Limited" },
+  FCCL: { pe: 5.8, eps: 15, divY: 9, roe: 20, name: "Fauji Cement Company" },
+  MCB: { pe: 4.5, eps: 38, divY: 11, roe: 25, name: "Muslim Commercial Bank" },
+  UBL: { pe: 5.3, eps: 30, divY: 10, roe: 21, name: "United Bank Limited" },
+  PPL: { pe: 4.8, eps: 28, divY: 13, roe: 24, name: "Pakistan Petroleum Limited" },
+  PSO: { pe: 6.1, eps: 45, divY: 14, roe: 26, name: "Pakistan State Oil" },
+  MARI: { pe: 7.2, eps: 55, divY: 7, roe: 22, name: "Mari Petroleum" },
+  HUBCO: { pe: 5.5, eps: 25, divY: 12, roe: 20, name: "Hub Power Company" },
 };
 
 // Benchmarks
@@ -38,8 +37,12 @@ async function analyzeStock() {
   updateLoaderStep(1);
 
   try {
-    // Use your Vercel API route
     const res = await fetch(`/api/psx?symbol=${raw}`);
+    
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status} ${res.statusText}`);
+    }
+    
     const json = await res.json();
 
     if (!json?.data || json.data.length < 2) {
@@ -49,6 +52,7 @@ async function analyzeStock() {
     updateLoaderStep(2);
 
     // ===== FIX: Map flat array [timestamp, close, volume, open] to objects =====
+    // Data comes in reverse chronological order (newest first)
     const data = json.data.map(row => ({
       timestamp: row[0],
       close: row[1],
@@ -56,8 +60,9 @@ async function analyzeStock() {
       open: row[3]
     }));
 
-    const latest = data[data.length - 1];
-    const prev = data[data.length - 2];
+    // ===== CRITICAL FIX: Latest is data[0], NOT data[data.length-1] =====
+    const latest = data[0];
+    const prev = data[1];
 
     // ===== PRICE =====
     const price = latest.close;
@@ -68,7 +73,9 @@ async function analyzeStock() {
     const volume = latest.volume;
 
     // ===== 52 WEEK =====
-    const last250 = data.slice(-250);
+    // Take last 250 entries (which are the oldest 250 since array is reverse chronological)
+    // Actually we need the last 250 trading days from the data
+    const last250 = data.slice(0, 250); // First 250 are most recent
     const prices = last250.map(d => d.close);
 
     const w52H = Math.max(...prices);
@@ -78,7 +85,7 @@ async function analyzeStock() {
     updateLoaderStep(3);
 
     // ===== FUNDAMENTALS =====
-    const f = FUNDAMENTALS[raw] || {};
+    const f = FUNDAMENTALS[raw] || { name: raw };
 
     const pe = f.pe ?? null;
     const eps = f.eps ?? null;
@@ -136,8 +143,8 @@ async function analyzeStock() {
       <div class="stock-header">
         <div class="stock-name-block">
           <h2>PSX:${raw}</h2>
-          <div class="company-name">Lucky Cement Limited</div>
-          <div class="data-note">⟳ Live via PSX</div>
+          <div class="company-name">${f.name}</div>
+          <div class="data-note">⟳ Live via PSX · ${new Date(latest.timestamp * 1000).toLocaleDateString('en-PK')}</div>
         </div>
         <div class="price-block">
           <div class="current-price">PKR ${f2(price)}</div>
@@ -272,7 +279,7 @@ async function analyzeStock() {
     // Trigger animations after render
     setTimeout(() => {
       document.querySelectorAll('.range-fill, .range-marker, .confidence-fill').forEach(el => {
-        el.style.width = el.style.width; // force reflow
+        el.style.width = el.style.width;
       });
     }, 50);
 

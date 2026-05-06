@@ -7,7 +7,12 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(
-      `https://dps.psx.com.pk/timeseries/eod/${symbol}`
+      `https://dps.psx.com.pk/timeseries/eod/${symbol}`,
+      {
+        headers: {
+          'Accept': 'application/json',
+        },
+      }
     );
     
     if (!response.ok) {

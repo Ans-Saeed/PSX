@@ -33,7 +33,7 @@ async function analyzeStock() {
   showLoading();
 
   try {
-    const res = await fetch(`https://dps.psx.com.pk/timeseries/eod/${raw}`);
+    const    fetch(`/api/psx?symbol=${raw}`)
     const json = await res.json();
 
     if (!json?.data || json.data.length < 2) {

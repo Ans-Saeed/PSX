@@ -1,115 +1,188 @@
 // ================= CONFIG =================
 const FUNDAMENTALS = {
-  OGDC: { pe: 4.2, eps: 32, divY: 12, roe: 28, name: "Oil & Gas Development Company", sector: "Energy" },
-  HBL: { pe: 5.1, eps: 28, divY: 10, roe: 22, name: "Habib Bank Limited", sector: "Banking" },
-  ENGRO: { pe: 6.5, eps: 35, divY: 8, roe: 30, name: "Engro Corporation", sector: "Fertilizer" },
-  LUCK: { pe: 8.2, eps: 42, divY: 6, roe: 18, name: "Lucky Cement Limited", sector: "Cement" },
-  FCCL: { pe: 5.8, eps: 15, divY: 9, roe: 20, name: "Fauji Cement Company", sector: "Cement" },
-  MCB: { pe: 4.5, eps: 38, divY: 11, roe: 25, name: "Muslim Commercial Bank", sector: "Banking" },
-  UBL: { pe: 5.3, eps: 30, divY: 10, roe: 21, name: "United Bank Limited", sector: "Banking" },
-  PPL: { pe: 4.8, eps: 28, divY: 13, roe: 24, name: "Pakistan Petroleum Limited", sector: "Energy" },
-  PSO: { pe: 6.1, eps: 45, divY: 14, roe: 26, name: "Pakistan State Oil", sector: "Energy" },
-  MARI: { pe: 7.2, eps: 55, divY: 7, roe: 22, name: "Mari Petroleum", sector: "Energy" },
-  HUBCO: { pe: 5.5, eps: 25, divY: 12, roe: 20, name: "Hub Power Company", sector: "Power" },
+  OGDC: { pe: 4.2, eps: 32.5, divY: 12.1, roe: 28.3, bvps: 145, debtEq: 0.15, profitMargin: 35, revenueGrowth: 8, name: "Oil & Gas Development Company", sector: "Energy" },
+  HBL: { pe: 5.1, eps: 28.4, divY: 10.2, roe: 22.1, bvps: 128, debtEq: 0.42, profitMargin: 28, revenueGrowth: 12, name: "Habib Bank Limited", sector: "Banking" },
+  ENGRO: { pe: 6.5, eps: 35.2, divY: 8.4, roe: 30.5, bvps: 115, debtEq: 0.55, profitMargin: 22, revenueGrowth: 15, name: "Engro Corporation", sector: "Fertilizer" },
+  LUCK: { pe: 8.2, eps: 42.1, divY: 6.2, roe: 18.4, bvps: 228, debtEq: 0.38, profitMargin: 18, revenueGrowth: 9, name: "Lucky Cement Limited", sector: "Cement" },
+  FCCL: { pe: 5.8, eps: 15.3, divY: 9.1, roe: 20.2, bvps: 76, debtEq: 0.28, profitMargin: 16, revenueGrowth: 11, name: "Fauji Cement Company", sector: "Cement" },
+  MCB: { pe: 4.5, eps: 38.7, divY: 11.3, roe: 25.6, bvps: 172, debtEq: 0.35, profitMargin: 32, revenueGrowth: 14, name: "Muslim Commercial Bank", sector: "Banking" },
+  UBL: { pe: 5.3, eps: 30.1, divY: 10.5, roe: 21.8, bvps: 138, debtEq: 0.40, profitMargin: 29, revenueGrowth: 10, name: "United Bank Limited", sector: "Banking" },
+  PPL: { pe: 4.8, eps: 28.9, divY: 13.2, roe: 24.1, bvps: 120, debtEq: 0.22, profitMargin: 33, revenueGrowth: 7, name: "Pakistan Petroleum Limited", sector: "Energy" },
+  PSO: { pe: 6.1, eps: 45.3, divY: 14.1, roe: 26.3, bvps: 182, debtEq: 0.48, profitMargin: 4, revenueGrowth: 18, name: "Pakistan State Oil", sector: "Energy" },
+  MARI: { pe: 7.2, eps: 55.8, divY: 7.3, roe: 22.4, bvps: 248, debtEq: 0.18, profitMargin: 38, revenueGrowth: 6, name: "Mari Petroleum", sector: "Energy" },
+  HUBCO: { pe: 5.5, eps: 25.4, divY: 12.5, roe: 20.1, bvps: 126, debtEq: 0.62, profitMargin: 15, revenueGrowth: 5, name: "Hub Power Company", sector: "Power" },
+  NBP: { pe: 4.2, eps: 22.1, divY: 11.8, roe: 19.5, bvps: 113, debtEq: 0.45, profitMargin: 25, revenueGrowth: 8, name: "National Bank of Pakistan", sector: "Banking" },
+  BAFL: { pe: 4.8, eps: 26.7, divY: 10.8, roe: 21.2, bvps: 125, debtEq: 0.38, profitMargin: 27, revenueGrowth: 13, name: "Bank Alfalah", sector: "Banking" },
+  ATRL: { pe: 5.2, eps: 31.4, divY: 9.5, roe: 23.8, bvps: 132, debtEq: 0.25, profitMargin: 12, revenueGrowth: 16, name: "Attock Refinery", sector: "Energy" },
+  NML: { pe: 6.8, eps: 18.2, divY: 7.8, roe: 16.5, bvps: 110, debtEq: 0.52, profitMargin: 14, revenueGrowth: 4, name: "Nishat Mills", sector: "Textile" },
+  DGKC: { pe: 7.5, eps: 12.8, divY: 5.2, roe: 14.2, bvps: 90, debtEq: 0.65, profitMargin: 11, revenueGrowth: 3, name: "DG Khan Cement", sector: "Cement" },
+  FFBL: { pe: 8.1, eps: 9.5, divY: 4.8, roe: 12.8, bvps: 74, debtEq: 0.58, profitMargin: 8, revenueGrowth: 2, name: "Fauji Fertilizer Bin Qasim", sector: "Fertilizer" },
+  KEL: { pe: 9.2, eps: 3.2, divY: 3.5, roe: 8.5, bvps: 38, debtEq: 1.85, profitMargin: 6, revenueGrowth: 7, name: "K-Electric", sector: "Power" },
+  PTC: { pe: 12.5, eps: 2.1, divY: 2.8, roe: 5.2, bvps: 40, debtEq: 0.15, profitMargin: 18, revenueGrowth: -2, name: "Pakistan Telecommunication", sector: "Telecom" },
+  UNITY: { pe: 3.8, eps: 18.5, divY: 15.2, roe: 32.1, bvps: 58, debtEq: 0.12, profitMargin: 28, revenueGrowth: 22, name: "Unity Foods", sector: "Consumer" },
 };
 
-// Sentiment keywords
-const SECTOR_SENTIMENT = {
-  Energy: {
-    positive: ['oil discovery', 'gas find', 'crude up', 'opec', 'production increase', 'drilling', 'exploration success', 'energy demand', 'fuel price hike'],
-    negative: ['oil spill', 'pipeline leak', 'production cut', 'crude down', 'sanctions', 'drilling ban', 'carbon tax', 'renewable shift', 'oil crash'],
-    global: ['middle east war', 'middle east tension', 'iran conflict', 'saudi attack', 'oil embargo', 'geopolitical risk', 'supply disruption', 'gaza', 'israel palestine', 'middle east conflict']
-  },
-  Banking: {
-    positive: ['rate hike', 'interest rate up', 'profit growth', 'loan growth', 'digital banking', 'merger', 'acquisition', 'branch expansion'],
-    negative: ['rate cut', 'interest rate down', 'npas', 'bad loans', 'fraud', 'cyber attack', 'regulatory fine', 'capital adequacy'],
-    global: ['fed rate', 'imf bailout', 'inflation', 'currency devaluation', 'pkr down']
-  },
-  Cement: {
-    positive: ['construction boom', 'infrastructure', 'dam project', 'housing scheme', 'cement demand', 'export orders', 'price increase'],
-    negative: ['construction halt', 'slowdown', 'coal price', 'energy cost', 'overcapacity', 'price war', 'import duty'],
-    global: ['china slowdown', 'real estate crash', 'construction sector']
-  },
-  Power: {
-    positive: ['tariff increase', 'capacity payment', 'renewable energy', 'solar project', 'wind power', 'grid expansion'],
-    negative: ['circular debt', 'tariff cut', 'fuel shortage', 'load shedding', 'ipp cancellation', 'regulatory delay'],
-    global: ['energy crisis', 'power shortage', 'fuel price', 'lng shortage']
-  },
-  Fertilizer: {
-    positive: ['urea demand', 'crop season', 'agriculture growth', 'export permission', 'subsidy', 'gas supply'],
-    negative: ['gas curtailment', 'urea shortage', 'import', 'price control', 'gas price hike'],
-    global: ['food security', 'wheat shortage', 'crop failure', 'monsoon']
-  }
-};
-
-const GLOBAL_SENTIMENT = {
-  veryPositive: ['bull market', 'rally', 'all time high', 'record profit', 'strong growth', 'economic boom', 'imf approval', 'investment inflow'],
-  positive: ['growth', 'profit', 'expansion', 'upgrade', 'outperform', 'buy rating', 'target raised', 'dividend announced'],
-  negative: ['recession', 'inflation', 'slowdown', 'layoff', 'downgrade', 'underperform', 'sell rating', 'target cut', 'loss'],
-  veryNegative: ['crash', 'bankruptcy', 'default', 'fraud', 'scandal', 'collapse', 'bailout', 'emergency', 'crisis', 'war', 'conflict', 'attack', 'tension', 'disruption']
-};
-
+// Benchmarks
 const PK_RATE = 18;
-const PSX_AVG_PE = 10;
+const PSX_AVG_PE = 8.5;
+const PSX_AVG_ROE = 16;
+const PSX_AVG_DIVY = 8;
 
 // ================= HELPERS =================
 const f2 = n => isNaN(+n) ? 'N/A' : (+n).toFixed(2);
+const f1 = n => isNaN(+n) ? 'N/A' : (+n).toFixed(1);
 const sign = n => (+n >= 0 ? '+' : '');
 const fmtVol = n => n > 1e6 ? (n/1e6).toFixed(2)+'M' : n > 1e3 ? (n/1e3).toFixed(0)+'K' : n;
 const fmtDate = ts => new Date(ts * 1000).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtDateShort = ts => new Date(ts * 1000).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' });
 
 function qs(ticker) {
   document.getElementById('stockInput').value = ticker;
   analyzeStock();
 }
 
-// ================= SENTIMENT ANALYSIS =================
-function analyzeSentiment(text, sector) {
-  text = text.toLowerCase();
-  let score = 0;
-  let matchedKeywords = [];
-  
-  const sectorKeywords = SECTOR_SENTIMENT[sector] || SECTOR_SENTIMENT.Energy;
-  
-  sectorKeywords.positive.forEach(kw => {
-    if (text.includes(kw)) { score += 2; matchedKeywords.push({ word: kw, type: 'positive' }); }
-  });
-  sectorKeywords.negative.forEach(kw => {
-    if (text.includes(kw)) { score -= 2; matchedKeywords.push({ word: kw, type: 'negative' }); }
-  });
-  sectorKeywords.global.forEach(kw => {
-    if (text.includes(kw)) { score -= 3; matchedKeywords.push({ word: kw, type: 'global-risk' }); }
-  });
-  
-  GLOBAL_SENTIMENT.veryPositive.forEach(kw => {
-    if (text.includes(kw)) { score += 3; matchedKeywords.push({ word: kw, type: 'very-positive' }); }
-  });
-  GLOBAL_SENTIMENT.positive.forEach(kw => {
-    if (text.includes(kw)) { score += 1; matchedKeywords.push({ word: kw, type: 'positive' }); }
-  });
-  GLOBAL_SENTIMENT.negative.forEach(kw => {
-    if (text.includes(kw)) { score -= 1; matchedKeywords.push({ word: kw, type: 'negative' }); }
-  });
-  GLOBAL_SENTIMENT.veryNegative.forEach(kw => {
-    if (text.includes(kw)) { score -= 4; matchedKeywords.push({ word: kw, type: 'very-negative' }); }
-  });
-  
-  return { score, keywords: matchedKeywords };
+// ================= FUNDAMENTAL ANALYSIS HELPERS =================
+function getPEAnalysis(pe) {
+  if (pe < 5) return { rating: 'Excellent', color: 'accent', desc: 'Deeply undervalued vs market avg of ' + PSX_AVG_PE, suggestion: 'Strong buy signal if earnings are stable' };
+  if (pe < PSX_AVG_PE) return { rating: 'Good', color: 'accent', desc: 'Trading below market average', suggestion: 'Potentially undervalued, investigate further' };
+  if (pe < 12) return { rating: 'Fair', color: 'warn', desc: 'Near market average valuation', suggestion: 'Fairly priced, look for growth catalysts' };
+  if (pe < 18) return { rating: 'High', color: 'danger', desc: 'Premium valuation vs market', suggestion: 'Ensure growth justifies the premium' };
+  return { rating: 'Expensive', color: 'danger', desc: 'Significantly overvalued', suggestion: 'Wait for correction or strong growth proof' };
 }
 
-// ================= NEWS FETCHING (via Vercel API) =================
+function getEPSAnalysis(eps, pe) {
+  if (eps > 40) return { rating: 'Strong', color: 'accent', desc: 'High earnings per share', suggestion: 'Company generates substantial profit per share' };
+  if (eps > 25) return { rating: 'Healthy', color: 'accent', desc: 'Solid earnings generation', suggestion: 'Sustainable profitability indicated' };
+  if (eps > 15) return { rating: 'Moderate', color: 'warn', desc: 'Average earnings power', suggestion: 'Monitor for earnings improvement' };
+  return { rating: 'Weak', color: 'danger', desc: 'Low earnings per share', suggestion: 'Check for turnaround or avoid' };
+}
+
+function getDivYAnalysis(divY) {
+  if (divY > 12) return { rating: 'Excellent', color: 'accent', desc: 'Very high dividend yield', suggestion: 'Great for income investors, verify sustainability' };
+  if (divY > 8) return { rating: 'Good', color: 'accent', desc: 'Above average yield', suggestion: 'Attractive income + potential upside' };
+  if (divY > 5) return { rating: 'Fair', color: 'warn', desc: 'Market average yield', suggestion: 'Balanced income and growth play' };
+  if (divY > 2) return { rating: 'Low', color: 'danger', desc: 'Below average yield', suggestion: 'Growth-focused, not for income' };
+  return { rating: 'None', color: 'danger', desc: 'No dividend income', suggestion: 'Pure growth/speculative play' };
+}
+
+function getROEAnalysis(roe) {
+  if (roe > 25) return { rating: 'Excellent', color: 'accent', desc: 'Exceptional capital efficiency', suggestion: 'Management creates superior shareholder value' };
+  if (roe > PK_RATE) return { rating: 'Good', color: 'accent', desc: 'Beats risk-free rate (' + PK_RATE + '%)', suggestion: 'Equity risk is compensated adequately' };
+  if (roe > 12) return { rating: 'Fair', color: 'warn', desc: 'Below risk-free rate', suggestion: 'Marginal equity returns, consider alternatives' };
+  return { rating: 'Poor', color: 'danger', desc: 'Poor capital utilization', suggestion: 'Management destroying shareholder value' };
+}
+
+function getDebtEqAnalysis(debtEq) {
+  if (debtEq < 0.2) return { rating: 'Very Safe', color: 'accent', desc: 'Minimal debt burden', suggestion: 'Strong balance sheet, recession-proof' };
+  if (debtEq < 0.5) return { rating: 'Safe', color: 'accent', desc: 'Conservative leverage', suggestion: 'Comfortable debt levels for sector' };
+  if (debtEq < 1.0) return { rating: 'Moderate', color: 'warn', desc: 'Average industry leverage', suggestion: 'Monitor interest rate sensitivity' };
+  if (debtEq < 1.5) return { rating: 'High', color: 'danger', desc: 'Elevated debt levels', suggestion: 'Vulnerable to rate hikes/cash flow issues' };
+  return { rating: 'Risky', color: 'danger', desc: 'Excessive leverage', suggestion: 'High bankruptcy risk in downturns' };
+}
+
+function getProfitMarginAnalysis(margin) {
+  if (margin > 30) return { rating: 'Excellent', color: 'accent', desc: 'Strong pricing power', suggestion: 'Wide moat, premium business model' };
+  if (margin > 15) return { rating: 'Good', color: 'accent', desc: 'Healthy margins', suggestion: 'Sustainable competitive advantage' };
+  if (margin > 8) return { rating: 'Fair', color: 'warn', desc: 'Thin margins', suggestion: 'Volume-dependent business, watch costs' };
+  return { rating: 'Weak', color: 'danger', desc: 'Very low margins', suggestion: 'Commodity business, cyclical risk high' };
+}
+
+function getRevenueGrowthAnalysis(growth) {
+  if (growth > 20) return { rating: 'Excellent', color: 'accent', desc: 'Hyper-growth phase', suggestion: 'Early stage or market share gains' };
+  if (growth > 10) return { rating: 'Good', color: 'accent', desc: 'Strong growth trajectory', suggestion: 'Business expanding effectively' };
+  if (growth > 5) return { rating: 'Steady', color: 'warn', desc: 'Moderate growth', suggestion: 'Mature business, stable cash flows' };
+  if (growth > 0) return { rating: 'Slow', color: 'warn', desc: 'Stagnant growth', suggestion: 'Market saturation or competition' };
+  return { rating: 'Declining', color: 'danger', desc: 'Negative growth', suggestion: 'Structural issues, avoid or turnaround bet' };
+}
+
+function getBVPSAnalysis(bvps, price) {
+  const pb = price / bvps;
+  if (pb < 1) return { rating: 'Deep Value', color: 'accent', desc: 'Trading below book value', suggestion: 'Assets worth more than price, potential bargain' };
+  if (pb < 1.5) return { rating: 'Value', color: 'accent', desc: 'Near book value', suggestion: 'Reasonable asset backing' };
+  if (pb < 3) return { rating: 'Fair', color: 'warn', desc: 'Moderate premium to book', suggestion: 'Growth/intangibles justify premium' };
+  return { rating: 'Premium', color: 'danger', desc: 'High price-to-book', suggestion: 'Ensure ROE justifies the premium' };
+}
+
+// Calculate fair value using multiple methods
+function calculateFairValue(f, price) {
+  const methods = [];
+
+  // Method 1: P/E reversion to mean
+  if (f.eps) {
+    const peFair = f.eps * PSX_AVG_PE;
+    methods.push({ name: 'P/E Mean Reversion', value: peFair, desc: `EPS × Market Avg P/E (${PSX_AVG_PE})` });
+  }
+
+  // Method 2: Dividend discount (Gordon Growth)
+  if (f.divY && f.divY > 0) {
+    const divPerShare = price * (f.divY / 100);
+    const growthRate = Math.min(f.revenueGrowth / 100, 0.05);
+    const discountRate = 0.12; // 12% required return
+    if (discountRate > growthRate) {
+      const ddmFair = divPerShare / (discountRate - growthRate);
+      methods.push({ name: 'Dividend Discount', value: ddmFair, desc: `Dividend ÷ (Discount Rate - Growth)` });
+    }
+  }
+
+  // Method 3: Book value + premium
+  if (f.bvps) {
+    const pbFair = f.bvps * (f.roe / PK_RATE); // Premium based on ROE spread
+    methods.push({ name: 'Book Value Premium', value: pbFair, desc: `BVPS × ROE Spread Premium` });
+  }
+
+  // Method 4: Graham Number
+  if (f.eps && f.bvps) {
+    const graham = Math.sqrt(22.5 * f.eps * f.bvps);
+    methods.push({ name: 'Graham Number', value: graham, desc: `√(22.5 × EPS × BVPS)` });
+  }
+
+  // Average fair value
+  const validMethods = methods.filter(m => !isNaN(m.value) && m.value > 0);
+  const avgFair = validMethods.reduce((a, m) => a + m.value, 0) / validMethods.length;
+  const upside = ((avgFair - price) / price) * 100;
+
+  return { methods, avgFair, upside, count: validMethods.length };
+}
+
+// ================= HISTORICAL PRICE LOOKUP =================
+function getHistoricalPrices(data) {
+  const now = Date.now() / 1000;
+  const periods = [
+    { label: '1M', days: 30 },
+    { label: '2M', days: 60 },
+    { label: '3M', days: 90 },
+    { label: '5M', days: 150 },
+    { label: '1Y', days: 365 },
+    { label: '2Y', days: 730 },
+    { label: '3Y', days: 1095 }
+  ];
+
+  return periods.map(p => {
+    const targetTs = now - (p.days * 86400);
+    // Find closest data point
+    let closest = data.reduce((prev, curr) => {
+      return Math.abs(curr.timestamp - targetTs) < Math.abs(prev.timestamp - targetTs) ? curr : prev;
+    });
+
+    const chg = ((data[0].close - closest.close) / closest.close) * 100;
+    return {
+      label: p.label,
+      date: closest.timestamp,
+      price: closest.close,
+      change: chg,
+      daysDiff: Math.round(Math.abs(closest.timestamp - targetTs) / 86400)
+    };
+  });
+}
+
+// ================= NEWS FETCHING (separate, no impact on valuation) =================
 async function fetchNews(symbol, sector) {
   try {
-    // Fetch news through your Vercel API (avoids CORS & exposes no API key)
     const res = await fetch(`/api/psx?news=true&q=${encodeURIComponent(symbol)}&sector=${encodeURIComponent(sector)}`);
-    
     if (!res.ok) throw new Error('News API failed');
-    
     const json = await res.json();
     return json.articles || [];
-    
   } catch (err) {
-    console.log('News fetch failed, using fallback:', err);
     return generateFallbackNews(symbol, sector);
   }
 }
@@ -121,33 +194,62 @@ function generateFallbackNews(symbol, sector) {
       { title: "Global oil prices fluctuate amid Middle East tensions", source: "Reuters", date: today },
       { title: "Pakistan explores new gas reserves in Sindh", source: "Dawn", date: today },
       { title: "OPEC+ maintains production cuts, crude stabilizes", source: "Bloomberg", date: today },
-      { title: "Middle East conflict raises supply disruption fears", source: "Al Jazeera", date: today, sentiment: -3 }
+      { title: "Middle East conflict raises supply disruption fears", source: "Al Jazeera", date: today },
+      { title: "US shale production hits record highs", source: "Financial Times", date: today }
     ],
     Banking: [
       { title: "SBP holds policy rate steady at 12%", source: "Express Tribune", date: today },
       { title: "Pakistan banking sector sees 15% profit growth", source: "Business Recorder", date: today },
-      { title: "Digital banking transformation accelerates in Pakistan", source: "The News", date: today }
+      { title: "Digital banking transformation accelerates in Pakistan", source: "The News", date: today },
+      { title: "IMF review prompts banking sector reforms", source: "Dawn", date: today },
+      { title: "Islamic banking assets cross Rs5 trillion", source: "The Nation", date: today }
     ],
     Cement: [
       { title: "Construction activity picks up ahead of budget", source: "Dawn", date: today },
-      { title: "Coal prices impact cement sector margins", source: "Business Recorder", date: today, sentiment: -1 },
-      { title: "Housing sector stimulus expected in new budget", source: "The Nation", date: today }
+      { title: "Coal prices impact cement sector margins", source: "Business Recorder", date: today },
+      { title: "Housing sector stimulus expected in new budget", source: "The Nation", date: today },
+      { title: "China slowdown affects cement exports", source: "Reuters", date: today },
+      { title: "Diamer Bhasha Dam boosts cement demand", source: "Express Tribune", date: today }
     ],
     Power: [
-      { title: "Circular debt crosses Rs2.9 trillion mark", source: "Dawn", date: today, sentiment: -3 },
+      { title: "Circular debt crosses Rs2.9 trillion mark", source: "Dawn", date: today },
       { title: "New solar projects approved under renewable policy", source: "Express Tribune", date: today },
-      { title: "Power tariff hike expected next quarter", source: "The News", date: today }
+      { title: "Power tariff hike expected next quarter", source: "The News", date: today },
+      { title: "LNG supply crunch affects power generation", source: "Business Recorder", date: today },
+      { title: "China offers $10bn for renewable energy projects", source: "Bloomberg", date: today }
     ],
     Fertilizer: [
       { title: "Kharif season drives urea demand", source: "Business Recorder", date: today },
-      { title: "Gas supply issues persist for fertilizer plants", source: "Dawn", date: today, sentiment: -2 },
-      { title: "Government considers fertilizer subsidy extension", source: "The Nation", date: today }
+      { title: "Gas supply issues persist for fertilizer plants", source: "Dawn", date: today },
+      { title: "Government considers fertilizer subsidy extension", source: "The Nation", date: today },
+      { title: "Global urea prices surge on supply cuts", source: "Reuters", date: today },
+      { title: "India bans fertilizer exports, Pakistan benefits", source: "Financial Times", date: today }
+    ],
+    Textile: [
+      { title: "EU GSP+ status boosts textile exports", source: "Dawn", date: today },
+      { title: "Cotton prices rise on global supply concerns", source: "Business Recorder", date: today },
+      { title: "Energy costs hurt textile competitiveness", source: "The News", date: today },
+      { title: "Bangladesh crisis shifts orders to Pakistan", source: "Reuters", date: today },
+      { title: "Sustainable fashion trend opens new markets", source: "Financial Times", date: today }
+    ],
+    Telecom: [
+      { title: "5G spectrum auction delayed again", source: "Dawn", date: today },
+      { title: "Mobile data usage grows 40% YoY", source: "Express Tribune", date: today },
+      { title: "Regulator slashes interconnection charges", source: "The News", date: today },
+      { title: "Starlink negotiations with Pakistan continue", source: "Bloomberg", date: today },
+      { title: "Fiber optic expansion reaches rural areas", source: "Business Recorder", date: today }
+    ],
+    Consumer: [
+      { title: "Inflation slows to 8-year low", source: "Dawn", date: today },
+      { title: "Consumer spending rebounds in urban centers", source: "Express Tribune", date: today },
+      { title: "Edible oil prices drop on global surplus", source: "Business Recorder", date: today },
+      { title: "Pakistan food exports to Middle East surge", source: "The Nation", date: today },
+      { title: "Ramadan drives seasonal demand spike", source: "The News", date: today }
     ]
   };
   return (sectorNews[sector] || sectorNews.Energy).map(n => ({
     ...n,
-    description: n.title,
-    analysis: { adjustedScore: n.sentiment || 0, keywords: [] }
+    description: n.title
   }));
 }
 
@@ -161,9 +263,7 @@ async function analyzeStock() {
 
   try {
     const res = await fetch(`/api/psx?symbol=${raw}`);
-    
     if (!res.ok) throw new Error(`API error: ${res.status}`);
-    
     const json = await res.json();
     if (!json?.data || json.data.length < 2) throw new Error("Ticker not found or insufficient data");
 
@@ -186,108 +286,134 @@ async function analyzeStock() {
     const w52L = Math.min(...prices);
     const pct52 = ((price - w52L) / (w52H - w52L)) * 100;
 
-    updateLoaderStep(3, 'Fetching news sentiment…');
-    
+    updateLoaderStep(3, 'Loading fundamentals…');
+
     const f = FUNDAMENTALS[raw] || { name: raw, sector: 'Energy' };
+
+    // Ensure all fundamental values exist with defaults
     const pe = f.pe ?? null;
     const eps = f.eps ?? null;
     const divY = f.divY ?? 0;
     const roe = f.roe ?? null;
+    const bvps = f.bvps ?? null;
+    const debtEq = f.debtEq ?? null;
+    const profitMargin = f.profitMargin ?? null;
+    const revenueGrowth = f.revenueGrowth ?? null;
     const sector = f.sector || 'Energy';
 
-    // Fetch news
-    const news = await fetchNews(raw, sector);
-    
-    let totalSentiment = 0;
-    const analyzedNews = news.map(item => {
-      const analysis = analyzeSentiment(item.title, sector);
-      const itemSentiment = item.sentiment || 0;
-      const adjustedScore = analysis.score + itemSentiment;
-      totalSentiment += adjustedScore;
-      return { ...item, analysis: { ...analysis, adjustedScore } };
-    });
+    // Calculate fair value
+    const fairValue = calculateFairValue({ pe, eps, divY, roe, bvps, revenueGrowth, profitMargin }, price);
 
-    // Scoring
-    let fundamentalScore = 0;
+    // Get historical prices
+    const history = getHistoricalPrices(data);
+
+    updateLoaderStep(4, 'Fetching news…');
+
+    // Fetch news (separate, does NOT affect valuation)
+    const news = await fetchNews(raw, sector);
+
+    // ===== FUNDAMENTAL SCORING (News does NOT affect this) =====
+    let score = 0;
     const checklist = [];
 
     if (pe !== null) {
       const ok = pe < PSX_AVG_PE;
-      fundamentalScore += ok ? 1.5 : -1;
-      checklist.push({ label: `P/E ${f2(pe)} vs avg ${PSX_AVG_PE}`, status: ok ? 'pass' : 'fail', weight: 1.5 });
+      score += ok ? 1.5 : -1;
+      checklist.push({ label: `P/E ${f2(pe)} vs avg ${PSX_AVG_PE}`, status: ok ? 'pass' : 'fail' });
     }
 
     if (roe !== null) {
       const ok = roe > PK_RATE;
-      fundamentalScore += ok ? 1 : -0.5;
-      checklist.push({ label: `ROE ${roe}% vs ${PK_RATE}%`, status: ok ? 'pass' : 'warn', weight: 1 });
+      score += ok ? 1 : -0.5;
+      checklist.push({ label: `ROE ${roe}% vs ${PK_RATE}%`, status: ok ? 'pass' : 'warn' });
     }
 
     if (divY > 0) {
-      const ok = divY > 10;
-      fundamentalScore += ok ? 0.5 : 0;
-      checklist.push({ label: `Dividend ${divY}%`, status: ok ? 'pass' : 'warn', weight: 0.5 });
+      const ok = divY > PSX_AVG_DIVY;
+      score += ok ? 0.5 : 0;
+      checklist.push({ label: `Dividend ${divY}% vs avg ${PSX_AVG_DIVY}%`, status: ok ? 'pass' : 'warn' });
+    }
+
+    if (debtEq !== null) {
+      const ok = debtEq < 0.5;
+      score += ok ? 0.5 : -0.5;
+      checklist.push({ label: `Debt/Equity ${f2(debtEq)}`, status: ok ? 'pass' : 'warn' });
+    }
+
+    if (profitMargin !== null) {
+      const ok = profitMargin > 15;
+      score += ok ? 0.5 : 0;
+      checklist.push({ label: `Profit Margin ${profitMargin}%`, status: ok ? 'pass' : 'warn' });
+    }
+
+    if (revenueGrowth !== null) {
+      const ok = revenueGrowth > 5;
+      score += ok ? 0.5 : -0.5;
+      checklist.push({ label: `Revenue Growth ${revenueGrowth}%`, status: ok ? 'pass' : 'warn' });
     }
 
     if (pct52 < 35) {
-      fundamentalScore += 0.5;
-      checklist.push({ label: `Near 52w low (${f2(pct52)}%)`, status: 'pass', weight: 0.5 });
+      score += 0.5;
+      checklist.push({ label: `Near 52w low (${f2(pct52)}%)`, status: 'pass' });
     } else if (pct52 > 80) {
-      fundamentalScore -= 0.5;
-      checklist.push({ label: `Near 52w high (${f2(pct52)}%)`, status: 'warn', weight: 0.5 });
+      score -= 0.5;
+      checklist.push({ label: `Near 52w high (${f2(pct52)}%)`, status: 'warn' });
     }
 
-    let technicalScore = 0;
-    if (chgPct > 2) technicalScore += 0.5;
-    else if (chgPct < -2) technicalScore -= 0.5;
-    
+    // Technical score
+    let techScore = 0;
+    if (chgPct > 2) techScore += 0.5;
+    else if (chgPct < -2) techScore -= 0.5;
+
     const avgVol = data.slice(1, 20).reduce((a, b) => a + b.volume, 0) / 19;
     if (volume > avgVol * 1.5) {
-      technicalScore += chgPct > 0 ? 0.5 : -0.5;
-      checklist.push({ label: `High volume breakout`, status: chgPct > 0 ? 'pass' : 'warn', weight: 0.5 });
+      techScore += chgPct > 0 ? 0.5 : -0.5;
     }
 
-    const normalizedSentiment = Math.max(-2, Math.min(2, totalSentiment / 3));
-    
-    if (normalizedSentiment > 1) checklist.push({ label: `News sentiment: Very Positive`, status: 'pass', weight: 1 });
-    else if (normalizedSentiment > 0.5) checklist.push({ label: `News sentiment: Positive`, status: 'pass', weight: 0.5 });
-    else if (normalizedSentiment < -1) checklist.push({ label: `News sentiment: Very Negative`, status: 'fail', weight: 1 });
-    else if (normalizedSentiment < -0.5) checklist.push({ label: `News sentiment: Negative`, status: 'warn', weight: 0.5 });
-    else checklist.push({ label: `News sentiment: Neutral`, status: 'pass', weight: 0 });
+    const totalScore = score + techScore;
 
-    const totalScore = fundamentalScore + technicalScore + normalizedSentiment;
-    
+    // ===== VERDICT (Based ONLY on fundamentals + technical, NOT news) =====
     let verdict, confidence, verdictReason;
 
     if (totalScore >= 2.5) {
       verdict = 'BUY'; confidence = Math.min(95, 70 + totalScore * 5);
-      verdictReason = 'Strong fundamentals with positive news sentiment and favorable technical setup.';
+      verdictReason = 'Strong fundamentals with favorable technical setup. Stock appears undervalued relative to market benchmarks.';
     } else if (totalScore >= 0.5) {
       verdict = 'BUY'; confidence = Math.min(85, 60 + totalScore * 8);
-      verdictReason = 'Good fundamentals with supportive news flow. Consider accumulating on dips.';
+      verdictReason = 'Good fundamentals with reasonable valuation. Consider accumulating on dips.';
     } else if (totalScore >= -0.5) {
       verdict = 'HOLD'; confidence = 55;
-      verdictReason = 'Mixed signals. Fundamentals are stable but news sentiment is neutral. Hold existing positions.';
+      verdictReason = 'Mixed signals. Fundamentals are stable but not compelling. Hold existing positions.';
     } else if (totalScore >= -2) {
       verdict = 'HOLD'; confidence = 50;
-      verdictReason = 'Caution advised. Negative news sentiment may pressure the stock despite reasonable fundamentals.';
+      verdictReason = 'Caution advised. Some fundamental weaknesses present. Monitor for improvement.';
     } else {
       verdict = 'SELL'; confidence = Math.min(90, 60 + Math.abs(totalScore) * 5);
-      verdictReason = 'Multiple red flags: weak fundamentals, negative news sentiment, and unfavorable technicals.';
+      verdictReason = 'Multiple fundamental red flags. Valuation concerns and weak metrics suggest reducing exposure.';
     }
 
-    if (normalizedSentiment <= -2 && fundamentalScore < 1) {
-      verdict = 'SELL'; confidence = 85;
-      verdictReason = 'Severe negative news sentiment detected. Risk-off environment suggests reducing exposure.';
-    }
-    if (normalizedSentiment >= 2 && fundamentalScore > 0) {
-      verdict = 'BUY'; confidence = 90;
-      verdictReason = 'Exceptionally positive news flow with solid fundamentals. Strong conviction buy.';
+    // Fair value override
+    if (fairValue.upside > 30 && totalScore > 0) {
+      verdict = 'STRONG BUY'; confidence = 92;
+      verdictReason = `Significant undervaluation detected. Fair value estimate (${f2(fairValue.avgFair)}) is ${f2(fairValue.upside)}% above current price.`;
+    } else if (fairValue.upside < -20 && totalScore < 0) {
+      verdict = 'SELL'; confidence = 88;
+      verdictReason = `Overvalued by ${f2(Math.abs(fairValue.upside))}% vs fair value estimate. Fundamentals do not support current price.`;
     }
 
-    updateLoaderStep(4);
+    updateLoaderStep(5);
 
-    // Render HTML
+    // Get analysis objects
+    const peAnalysis = pe ? getPEAnalysis(pe) : null;
+    const epsAnalysis = eps ? getEPSAnalysis(eps, pe) : null;
+    const divAnalysis = divY ? getDivYAnalysis(divY) : null;
+    const roeAnalysis = roe ? getROEAnalysis(roe) : null;
+    const debtAnalysis = debtEq !== null ? getDebtEqAnalysis(debtEq) : null;
+    const marginAnalysis = profitMargin !== null ? getProfitMarginAnalysis(profitMargin) : null;
+    const growthAnalysis = revenueGrowth !== null ? getRevenueGrowthAnalysis(revenueGrowth) : null;
+    const bvpsAnalysis = bvps ? getBVPSAnalysis(bvps, price) : null;
+
+    // ===== RENDER =====
     const html = `
       <div class="stock-header">
         <div class="stock-name-block">
@@ -317,89 +443,281 @@ async function analyzeStock() {
         <div class="range-position">Current position: <strong>${f2(pct52)}%</strong> of 52-week range</div>
       </div>
 
-      <div class="metrics-grid">
-        <div class="metric-card"><div class="metric-label">P/E Ratio</div><div class="metric-value">${pe ?? 'N/A'}</div><div class="metric-explain">Price to Earnings</div></div>
-        <div class="metric-card"><div class="metric-label">EPS</div><div class="metric-value">${eps ?? 'N/A'}</div><div class="metric-explain">Earnings Per Share</div></div>
-        <div class="metric-card"><div class="metric-label">Dividend Yield</div><div class="metric-value">${divY}%</div><div class="metric-explain">Annual Dividend Return</div></div>
-        <div class="metric-card"><div class="metric-label">Volume</div><div class="metric-value">${fmtVol(volume)}</div><div class="metric-explain">Today's Shares Traded</div></div>
-        <div class="metric-card"><div class="metric-label">Day Open</div><div class="metric-value">${f2(latest.open)}</div><div class="metric-explain">Opening Price</div></div>
-        <div class="metric-card"><div class="metric-label">52W Position</div><div class="metric-value">${f2(pct52)}%</div><div class="metric-explain">Relative to yearly range</div></div>
-      </div>
-
-      <div class="section news-section">
-        <div class="section-title">📰 News Sentiment Analysis</div>
-        <div class="sentiment-summary">
-          <div class="sentiment-score ${totalSentiment > 0 ? 'positive' : totalSentiment < 0 ? 'negative' : 'neutral'}">
-            <div class="sentiment-number">${totalSentiment > 0 ? '+' : ''}${f2(totalSentiment)}</div>
-            <div class="sentiment-label">Sentiment Score</div>
-          </div>
-          <div class="sentiment-bar-wrap">
-            <div class="sentiment-track">
-              <div class="sentiment-fill" style="width: ${50 + (Math.max(-10, Math.min(10, totalSentiment)) / 20 * 50)}%; background: ${totalSentiment > 0 ? 'var(--accent)' : totalSentiment < 0 ? 'var(--danger)' : 'var(--warn)'}"></div>
+      <!-- FAIR VALUE SECTION -->
+      <div class="section fairvalue-section">
+        <div class="section-title">Fair Value Estimates</div>
+        <div class="fairvalue-grid">
+          ${fairValue.methods.map(m => `
+            <div class="fairvalue-card">
+              <div class="fairvalue-name">${m.name}</div>
+              <div class="fairvalue-price">PKR ${f2(m.value)}</div>
+              <div class="fairvalue-desc">${m.desc}</div>
+              <div class="fairvalue-vs-current ${m.value > price ? 'up' : 'dn'}">
+                ${m.value > price ? '+' : ''}${f2(((m.value - price) / price) * 100)}% vs current
+              </div>
             </div>
-            <div class="sentiment-legend"><span>Very Negative</span><span>Neutral</span><span>Very Positive</span></div>
+          `).join('')}
+          <div class="fairvalue-card highlight">
+            <div class="fairvalue-name">Consensus Fair Value</div>
+            <div class="fairvalue-price big">PKR ${f2(fairValue.avgFair)}</div>
+            <div class="fairvalue-desc">Average of ${fairValue.count} valuation methods</div>
+            <div class="fairvalue-vs-current ${fairValue.upside > 0 ? 'up' : 'dn'}">
+              ${fairValue.upside > 0 ? '+' : ''}${f2(fairValue.upside)}% implied upside
+            </div>
           </div>
         </div>
-        <div class="news-grid">
-          ${analyzedNews.map(item => `
-            <div class="news-card ${item.analysis.adjustedScore > 0 ? 'positive' : item.analysis.adjustedScore < 0 ? 'negative' : ''}">
-              <div class="news-header">
-                <span class="news-source">${item.source}</span>
-                <span class="news-date">${new Date(item.date).toLocaleDateString('en-PK')}</span>
-              </div>
-              <div class="news-title">${item.title}</div>
-              <div class="news-keywords">
-                ${item.analysis.keywords.map(k => `<span class="keyword ${k.type}">${k.word}</span>`).join('')}
-              </div>
-              <div class="news-sentiment-badge ${item.analysis.adjustedScore > 0 ? 'pos' : item.analysis.adjustedScore < 0 ? 'neg' : 'neu'}">
-                ${item.analysis.adjustedScore > 0 ? 'Bullish' : item.analysis.adjustedScore < 0 ? 'Bearish' : 'Neutral'}
+      </div>
+
+      <!-- HISTORICAL PRICES -->
+      <div class="section history-section">
+        <div class="section-title">Historical Performance</div>
+        <div class="history-grid">
+          ${history.map(h => `
+            <div class="history-card">
+              <div class="history-period">${h.label}</div>
+              <div class="history-date">${fmtDateShort(h.date)}${h.daysDiff > 5 ? ' <span class="approx">(approx)</span>' : ''}</div>
+              <div class="history-price">PKR ${f2(h.price)}</div>
+              <div class="history-change ${h.change >= 0 ? 'up' : 'dn'}">
+                ${sign(h.change)}${f2(h.change)}% since then
               </div>
             </div>
           `).join('')}
         </div>
       </div>
 
-      <div class="section">
+      <!-- ENHANCED FUNDAMENTALS -->
+      <div class="section fundamentals-section">
         <div class="section-title">Fundamental Analysis</div>
-        <div class="fund-grid">
-          <div class="fund-card"><div class="fund-card-label">Valuation</div><div class="fund-card-value">${pe ? (pe < PSX_AVG_PE ? 'Undervalued' : 'Fair/High') : 'N/A'}</div><div class="fund-card-note">P/E of ${pe ?? '?'} vs market avg ${PSX_AVG_PE}</div></div>
-          <div class="fund-card"><div class="fund-card-label">Profitability</div><div class="fund-card-value">${roe ? (roe > PK_RATE ? 'Strong' : 'Moderate') : 'N/A'}</div><div class="fund-card-note">ROE of ${roe ?? '?'}% vs risk-free ${PK_RATE}%</div></div>
-          <div class="fund-card"><div class="fund-card-label">Income</div><div class="fund-card-value">${divY > 10 ? 'Attractive' : divY > 5 ? 'Moderate' : 'Low'}</div><div class="fund-card-note">Dividend yield ${divY}% annual return</div></div>
+        <div class="fundamentals-grid">
+          ${pe ? `
+          <div class="fundamental-card">
+            <div class="fundamental-header">
+              <div class="fundamental-label">P/E Ratio</div>
+              <div class="fundamental-badge ${peAnalysis.color}">${peAnalysis.rating}</div>
+            </div>
+            <div class="fundamental-value">${f2(pe)}</div>
+            <div class="fundamental-context">Market Avg: ${PSX_AVG_PE}</div>
+            <div class="fundamental-bar">
+              <div class="fundamental-track">
+                <div class="fundamental-fill ${peAnalysis.color}" style="width:${Math.min(100, (pe / 15) * 100)}%"></div>
+              </div>
+            </div>
+            <div class="fundamental-insight">
+              <div class="insight-main">${peAnalysis.desc}</div>
+              <div class="insight-suggestion">💡 ${peAnalysis.suggestion}</div>
+            </div>
+          </div>
+          ` : ''}
+
+          ${eps ? `
+          <div class="fundamental-card">
+            <div class="fundamental-header">
+              <div class="fundamental-label">EPS</div>
+              <div class="fundamental-badge ${epsAnalysis.color}">${epsAnalysis.rating}</div>
+            </div>
+            <div class="fundamental-value">PKR ${f2(eps)}</div>
+            <div class="fundamental-context">Per Share Earnings</div>
+            <div class="fundamental-bar">
+              <div class="fundamental-track">
+                <div class="fundamental-fill ${epsAnalysis.color}" style="width:${Math.min(100, (eps / 50) * 100)}%"></div>
+              </div>
+            </div>
+            <div class="fundamental-insight">
+              <div class="insight-main">${epsAnalysis.desc}</div>
+              <div class="insight-suggestion">💡 ${epsAnalysis.suggestion}</div>
+            </div>
+          </div>
+          ` : ''}
+
+          ${divY > 0 ? `
+          <div class="fundamental-card">
+            <div class="fundamental-header">
+              <div class="fundamental-label">Dividend Yield</div>
+              <div class="fundamental-badge ${divAnalysis.color}">${divAnalysis.rating}</div>
+            </div>
+            <div class="fundamental-value">${f2(divY)}%</div>
+            <div class="fundamental-context">Annual Return</div>
+            <div class="fundamental-bar">
+              <div class="fundamental-track">
+                <div class="fundamental-fill ${divAnalysis.color}" style="width:${Math.min(100, (divY / 15) * 100)}%"></div>
+              </div>
+            </div>
+            <div class="fundamental-insight">
+              <div class="insight-main">${divAnalysis.desc}</div>
+              <div class="insight-suggestion">💡 ${divAnalysis.suggestion}</div>
+            </div>
+          </div>
+          ` : ''}
+
+          ${roe ? `
+          <div class="fundamental-card">
+            <div class="fundamental-header">
+              <div class="fundamental-label">ROE</div>
+              <div class="fundamental-badge ${roeAnalysis.color}">${roeAnalysis.rating}</div>
+            </div>
+            <div class="fundamental-value">${f2(roe)}%</div>
+            <div class="fundamental-context">Return on Equity</div>
+            <div class="fundamental-bar">
+              <div class="fundamental-track">
+                <div class="fundamental-fill ${roeAnalysis.color}" style="width:${Math.min(100, (roe / 35) * 100)}%"></div>
+              </div>
+            </div>
+            <div class="fundamental-insight">
+              <div class="insight-main">${roeAnalysis.desc}</div>
+              <div class="insight-suggestion">💡 ${roeAnalysis.suggestion}</div>
+            </div>
+          </div>
+          ` : ''}
+
+          ${bvps ? `
+          <div class="fundamental-card">
+            <div class="fundamental-header">
+              <div class="fundamental-label">Book Value / Share</div>
+              <div class="fundamental-badge ${bvpsAnalysis.color}">${bvpsAnalysis.rating}</div>
+            </div>
+            <div class="fundamental-value">PKR ${f2(bvps)}</div>
+            <div class="fundamental-context">P/B: ${f2(price / bvps)}x</div>
+            <div class="fundamental-bar">
+              <div class="fundamental-track">
+                <div class="fundamental-fill ${bvpsAnalysis.color}" style="width:${Math.min(100, ((price / bvps) / 3) * 100)}%"></div>
+              </div>
+            </div>
+            <div class="fundamental-insight">
+              <div class="insight-main">${bvpsAnalysis.desc}</div>
+              <div class="insight-suggestion">💡 ${bvpsAnalysis.suggestion}</div>
+            </div>
+          </div>
+          ` : ''}
+
+          ${debtEq !== null ? `
+          <div class="fundamental-card">
+            <div class="fundamental-header">
+              <div class="fundamental-label">Debt / Equity</div>
+              <div class="fundamental-badge ${debtAnalysis.color}">${debtAnalysis.rating}</div>
+            </div>
+            <div class="fundamental-value">${f2(debtEq)}x</div>
+            <div class="fundamental-context">Leverage Ratio</div>
+            <div class="fundamental-bar">
+              <div class="fundamental-track">
+                <div class="fundamental-fill ${debtAnalysis.color}" style="width:${Math.min(100, (debtEq / 2) * 100)}%"></div>
+              </div>
+            </div>
+            <div class="fundamental-insight">
+              <div class="insight-main">${debtAnalysis.desc}</div>
+              <div class="insight-suggestion">💡 ${debtAnalysis.suggestion}</div>
+            </div>
+          </div>
+          ` : ''}
+
+          ${profitMargin !== null ? `
+          <div class="fundamental-card">
+            <div class="fundamental-header">
+              <div class="fundamental-label">Profit Margin</div>
+              <div class="fundamental-badge ${marginAnalysis.color}">${marginAnalysis.rating}</div>
+            </div>
+            <div class="fundamental-value">${f2(profitMargin)}%</div>
+            <div class="fundamental-context">Net Margin</div>
+            <div class="fundamental-bar">
+              <div class="fundamental-track">
+                <div class="fundamental-fill ${marginAnalysis.color}" style="width:${Math.min(100, (profitMargin / 40) * 100)}%"></div>
+              </div>
+            </div>
+            <div class="fundamental-insight">
+              <div class="insight-main">${marginAnalysis.desc}</div>
+              <div class="insight-suggestion">💡 ${marginAnalysis.suggestion}</div>
+            </div>
+          </div>
+          ` : ''}
+
+          ${revenueGrowth !== null ? `
+          <div class="fundamental-card">
+            <div class="fundamental-header">
+              <div class="fundamental-label">Revenue Growth</div>
+              <div class="fundamental-badge ${growthAnalysis.color}">${growthAnalysis.rating}</div>
+            </div>
+            <div class="fundamental-value">${f2(revenueGrowth)}%</div>
+            <div class="fundamental-context">YoY Growth</div>
+            <div class="fundamental-bar">
+              <div class="fundamental-track">
+                <div class="fundamental-fill ${growthAnalysis.color}" style="width:${Math.min(100, Math.max(0, ((revenueGrowth + 5) / 30) * 100))}%"></div>
+              </div>
+            </div>
+            <div class="fundamental-insight">
+              <div class="insight-main">${growthAnalysis.desc}</div>
+              <div class="insight-suggestion">💡 ${growthAnalysis.suggestion}</div>
+            </div>
+          </div>
+          ` : ''}
         </div>
       </div>
 
+      <!-- PRICE PROJECTIONS -->
       <div class="section">
         <div class="section-title">Price Projections</div>
         <div class="projection-grid">
-          <div class="proj-card bear"><div class="proj-label">Bear Case</div><div class="proj-price">PKR ${f2(w52L * 0.95)}</div><div class="proj-return dn">${f2(((w52L * 0.95 - price) / price) * 100)}%</div><div class="proj-note">5% below 52-week low</div></div>
-          <div class="proj-card base"><div class="proj-label">Base Case</div><div class="proj-price">PKR ${f2((w52H + w52L) / 2)}</div><div class="proj-return ${((w52H + w52L) / 2 - price) >= 0 ? 'up' : 'dn'}">${f2((((w52H + w52L) / 2 - price) / price) * 100)}%</div><div class="proj-note">Midpoint of 52-week range</div></div>
-          <div class="proj-card bull"><div class="proj-label">Bull Case</div><div class="proj-price">PKR ${f2(w52H * 1.05)}</div><div class="proj-return up">${f2(((w52H * 1.05 - price) / price) * 100)}%</div><div class="proj-note">5% above 52-week high</div></div>
+          <div class="proj-card bear">
+            <div class="proj-label">Bear Case</div>
+            <div class="proj-price">PKR ${f2(w52L * 0.95)}</div>
+            <div class="proj-return dn">${f2(((w52L * 0.95 - price) / price) * 100)}%</div>
+            <div class="proj-note">5% below 52-week low</div>
+          </div>
+          <div class="proj-card base">
+            <div class="proj-label">Base Case</div>
+            <div class="proj-price">PKR ${f2((w52H + w52L) / 2)}</div>
+            <div class="proj-return ${((w52H + w52L) / 2 - price) >= 0 ? 'up' : 'dn'}">${f2((((w52H + w52L) / 2 - price) / price) * 100)}%</div>
+            <div class="proj-note">Midpoint of 52-week range</div>
+          </div>
+          <div class="proj-card bull">
+            <div class="proj-label">Bull Case</div>
+            <div class="proj-price">PKR ${f2(w52H * 1.05)}</div>
+            <div class="proj-return up">${f2(((w52H * 1.05 - price) / price) * 100)}%</div>
+            <div class="proj-note">5% above 52-week high</div>
+          </div>
         </div>
       </div>
 
-      <div class="verdict-card ${verdict.toLowerCase()}">
+      <!-- VERDICT -->
+      <div class="verdict-card ${verdict.toLowerCase().replace(' ', '-')}">
         <div class="verdict-inner">
           <div class="verdict-stamp">${verdict}</div>
           <div class="verdict-details">
             <div class="verdict-confidence">Confidence Level: ${Math.round(confidence)}%</div>
-            <div class="confidence-bar"><div class="confidence-fill" style="width:${confidence}%"></div></div>
+            <div class="confidence-bar">
+              <div class="confidence-fill" style="width:${confidence}%"></div>
+            </div>
             <div class="verdict-reasoning">${verdictReason}</div>
             <div class="score-breakdown">
-              <div class="score-item"><span>Fundamentals</span><span class="${fundamentalScore >= 0 ? 'up' : 'dn'}">${fundamentalScore > 0 ? '+' : ''}${f2(fundamentalScore)}</span></div>
-              <div class="score-item"><span>Technical</span><span class="${technicalScore >= 0 ? 'up' : 'dn'}">${technicalScore > 0 ? '+' : ''}${f2(technicalScore)}</span></div>
-              <div class="score-item"><span>News Sentiment</span><span class="${normalizedSentiment >= 0 ? 'up' : 'dn'}">${normalizedSentiment > 0 ? '+' : ''}${f2(normalizedSentiment)}</span></div>
+              <div class="score-item"><span>Fundamental Score</span><span class="${score >= 0 ? 'up' : 'dn'}">${score > 0 ? '+' : ''}${f2(score)}</span></div>
+              <div class="score-item"><span>Technical Score</span><span class="${techScore >= 0 ? 'up' : 'dn'}">${techScore > 0 ? '+' : ''}${f2(techScore)}</span></div>
               <div class="score-item total"><span>Total Score</span><span class="${totalScore >= 0 ? 'up' : 'dn'}">${totalScore > 0 ? '+' : ''}${f2(totalScore)}</span></div>
             </div>
             <div class="checklist">
               ${checklist.map(c => `
                 <div class="check-item">
-                  <span class="check-icon ${c.status}">${c.status === 'pass' ? '✓' : c.status === 'fail' ? '✕' : '◐'}</span>
+                  <span class="check-icon ${c.status}">${c.status === 'pass' ? '✓' : '◐'}</span>
                   <span>${c.label}</span>
-                  ${c.weight ? `<span class="check-weight">(${c.weight > 0 ? '+' : ''}${c.weight})</span>` : ''}
                 </div>
               `).join('')}
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- NEWS SECTION (at the bottom, separate from valuation) -->
+      <div class="section news-section">
+        <div class="section-title">📰 Latest News & Global Events</div>
+        <div class="news-intro">News is for informational purposes and does not directly affect the fundamental verdict above.</div>
+        <div class="news-grid">
+          ${news.map(item => `
+            <div class="news-card">
+              <div class="news-header">
+                <span class="news-source">${item.source}</span>
+                <span class="news-date">${new Date(item.date).toLocaleDateString('en-PK')}</span>
+              </div>
+              <div class="news-title">${item.title}</div>
+              ${item.description && item.description !== item.title ? `<div class="news-desc">${item.description}</div>` : ''}
+            </div>
+          `).join('')}
         </div>
       </div>
     `;
@@ -410,7 +728,7 @@ async function analyzeStock() {
     el.style.display = 'block';
 
     setTimeout(() => {
-      document.querySelectorAll('.range-fill, .range-marker, .confidence-fill, .sentiment-fill').forEach(el => {
+      document.querySelectorAll('.range-fill, .range-marker, .confidence-fill, .fundamental-fill').forEach(el => {
         el.style.width = el.style.width;
       });
     }, 50);

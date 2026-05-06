@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSX Research — Stock Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d12;
+    --surface: #111520;
+    --surface2: #161b27;
+    --border: #1e2535;
+    --accent: #00e5a0;
+    --accent2: #0094ff;
+    --danger: #ff4757;
+    --warn: #ffa502;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --dim: #3a4155;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 20px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    padding: 40px 20px 0;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 12px;
+    margin-bottom: 20px;
+    border-radius: 2px;
+  }
+
+  .logo-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  h1 span {
+    color: var(--accent);
+    font-style: italic;
+    font-family: 'Instrument Serif', serif;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 36px;
+  }
+
+  /* Search */
+  .search-wrap {
+    max-width: 560px;
+    margin: 0 auto 60px;
+    position: relative;
+  }
+
+  .search-box {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .search-box:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .search-prefix {
+    padding: 16px 16px;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    background: rgba(0,229,160,0.05);
+    border-right: 1px solid var(--border);
+    user-select: none;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 16px 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  input[type="text"]::placeholder {
+    color: var(--dim);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+  }
+
+  .search-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 16px 24px;
+    cursor: pointer;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .search-btn:hover { background: #00c88a; }
+  .search-btn:disabled { background: var(--dim); cursor: not-allowed; }
+
+  .popular-tags {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+
+  .tag:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Loading */
+  #loading {
+    display: none;
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .loader-ring {
+    width: 60px;
+    height: 60px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 20px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loader-text {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+  }
+
+  .loader-steps {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .loader-step {
+    font-size: 11px;
+    color: var(--dim);
+    transition: color 0.3s;
+  }
+
+  .loader-step.active { color: var(--accent); }
+
+  /* Results */
+  #results {
+    display: none;
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Stock Header */
+  .stock-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+    margin-bottom: 2px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .stock-name-block h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .stock-name-block .company-name {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  .price-block {
+    text-align: right;
+  }
+
+  .current-price {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .price-change {
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .price-change.up { color: var(--accent); }
+  .price-change.down { color: var(--danger); }
+
+  /* 52 Week Range Bar */
+  .range-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    padding: 24px 28px;
+    margin-bottom: 2px;
+  }
+
+  .range-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .range-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .range-val {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    min-width: 50px;
+  }
+
+  .range-val.low { color: var(--danger); }
+  .range-val.high { color: var(--accent); }
+
+  .range-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    position: relative;
+    overflow: visible;
+  }
+
+  .range-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: linear-gradient(90deg, var(--danger), var(--accent));
+    border-radius: 3px;
+    transition: width 1s ease;
+  }
+
+  .range-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border: 2px solid var(--accent2);
+    border-radius: 50%;
+    transition: left 1s ease;
+  }
+
+  /* Metrics Grid */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    margin-bottom: 2px;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px 22px;
+  }
+
+  .metric-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .metric-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .metric-explain {
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  /* Sections */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+    margin-bottom: 2px;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Layman fundamentals */
+  .fundamentals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .fund-item {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .fund-name {
+    font-size: 12px;
+    color: var(--muted);
+    padding-top: 2px;
+  }
+
+  .fund-explain {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  .fund-explain strong {
+    color: var(--accent);
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+  }
+
+  /* News Sentiment */
+  .news-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .news-item {
+    border-left: 3px solid var(--border);
+    padding: 12px 16px;
+    background: var(--surface2);
+  }
+
+  .news-item.bullish { border-left-color: var(--accent); }
+  .news-item.bearish { border-left-color: var(--danger); }
+  .news-item.neutral { border-left-color: var(--warn); }
+
+  .news-headline {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+    margin-bottom: 6px;
+  }
+
+  .news-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .news-source {
+    font-size: 10px;
+    color: var(--dim);
+  }
+
+  .news-sentiment-badge {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+
+  .sentiment-bull { background: rgba(0,229,160,0.1); color: var(--accent); }
+  .sentiment-bear { background: rgba(255,71,87,0.1); color: var(--danger); }
+  .sentiment-neutral { background: rgba(255,165,2,0.1); color: var(--warn); }
+
+  /* Sentiment Meter */
+  .sentiment-meter {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .sentiment-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .sent-bull-fill { background: var(--accent); transition: width 1s ease; }
+  .sent-bear-fill { background: var(--danger); transition: width 1s ease; }
+
+  .sentiment-label {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 80px;
+  }
+
+  /* Projections */
+  .projection-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .proj-card {
+    border: 1px solid var(--border);
+    padding: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .proj-card::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+  }
+
+  .proj-card.bear::before { background: var(--danger); }
+  .proj-card.base::before { background: var(--accent2); }
+  .proj-card.bull::before { background: var(--accent); }
+
+  .proj-scenario {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .proj-price {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .proj-card.bear .proj-price { color: var(--danger); }
+  .proj-card.base .proj-price { color: var(--accent2); }
+  .proj-card.bull .proj-price { color: var(--accent); }
+
+  .proj-return {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .proj-timeframe {
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 6px;
+  }
+
+  /* Verdict */
+  .verdict-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 36px 28px;
+    margin-bottom: 2px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .verdict-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+  }
+
+  .verdict-card.buy::before { background: linear-gradient(90deg, var(--accent), #00c88a); }
+  .verdict-card.hold::before { background: linear-gradient(90deg, var(--warn), #ffcc02); }
+  .verdict-card.sell::before { background: linear-gradient(90deg, var(--danger), #ff6b81); }
+
+  .verdict-inner {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    flex-wrap: wrap;
+  }
+
+  .verdict-stamp {
+    font-family: 'Syne', sans-serif;
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -2px;
+  }
+
+  .verdict-card.buy .verdict-stamp { color: var(--accent); }
+  .verdict-card.hold .verdict-stamp { color: var(--warn); }
+  .verdict-card.sell .verdict-stamp { color: var(--danger); }
+
+  .verdict-details { flex: 1; min-width: 200px; }
+
+  .verdict-confidence {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .confidence-bar {
+    height: 4px;
+    background: var(--border);
+    margin-bottom: 16px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1.2s ease;
+  }
+
+  .verdict-card.buy .confidence-fill { background: var(--accent); }
+  .verdict-card.hold .confidence-fill { background: var(--warn); }
+  .verdict-card.sell .confidence-fill { background: var(--danger); }
+
+  .verdict-reasoning {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  /* Checklist */
+  .checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .check-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .check-icon.pass { color: var(--accent); }
+  .check-icon.fail { color: var(--danger); }
+  .check-icon.warn { color: var(--warn); }
+
+  /* Error */
+  #error {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--danger);
+    padding: 28px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .error-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    color: var(--danger);
+    margin-bottom: 8px;
+  }
+
+  .error-msg { color: var(--muted); font-size: 13px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 600px) {
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .fund-item { grid-template-columns: 1fr; gap: 4px; }
+    .verdict-stamp { font-size: 40px; }
+    .projection-grid { grid-template-columns: 1fr; }
+    .stock-header { flex-direction: column; }
+    .price-block { text-align: left; }
+  }
+
+  .disclaimer {
+    text-align: center;
+    padding: 20px;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 0.05em;
+    line-height: 1.7;
+  }
+
+  /* Streaming text effect */
+  .streaming::after {
+    content: '▌';
+    animation: blink 0.7s step-end infinite;
+    color: var(--accent);
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-tag">
+    <span class="logo-dot"></span>
+    PSX Intelligence Terminal
+  </div>
+  <h1>Stock <span>Research</span></h1>
+  <p class="subtitle">AI-powered analysis · Real-time news sentiment · Buy/Sell verdict</p>
+</header>
+
+<div class="container">
+  <div class="search-wrap">
+    <div class="search-box">
+      <div class="search-prefix">PSX:</div>
+      <input type="text" id="stockInput" placeholder="e.g. FCCL, ENGRO, LUCK, HBL..." maxlength="10">
+      <button class="search-btn" id="searchBtn" onclick="analyzeStock()">ANALYSE →</button>
+    </div>
+    <div class="popular-tags">
+      <span class="tag" onclick="quickSearch('FCCL')">FCCL</span>
+      <span class="tag" onclick="quickSearch('ENGRO')">ENGRO</span>
+      <span class="tag" onclick="quickSearch('LUCK')">LUCK</span>
+      <span class="tag" onclick="quickSearch('HBL')">HBL</span>
+      <span class="tag" onclick="quickSearch('OGDC')">OGDC</span>
+      <span class="tag" onclick="quickSearch('PPL')">PPL</span>
+      <span class="tag" onclick="quickSearch('MCB')">MCB</span>
+      <span class="tag" onclick="quickSearch('UBL')">UBL</span>
+    </div>
+  </div>
+
+  <div id="loading">
+    <div class="loader-ring"></div>
+    <div class="loader-text">ANALYSING STOCK</div>
+    <div class="loader-steps">
+      <div class="loader-step" id="step1">⟳ Fetching market data & financials...</div>
+      <div class="loader-step" id="step2">⟳ Scanning news & investor sentiment...</div>
+      <div class="loader-step" id="step3">⟳ Running valuation models...</div>
+      <div class="loader-step" id="step4">⟳ Generating buy/sell verdict...</div>
+    </div>
+  </div>
+
+  <div id="error">
+    <div class="error-title">Analysis Failed</div>
+    <div class="error-msg" id="errorMsg">Could not retrieve data for this stock.</div>
+  </div>
+
+  <div id="results"></div>
+
+  <div class="disclaimer">
+    ⚠ This tool is for research and educational purposes only. Not financial advice.<br>
+    Always consult a licensed investment advisor before making investment decisions.
+  </div>
+</div>
+
+<script>
+const API_URL = "https://api.anthropic.com/v1/messages";
+
+function quickSearch(ticker) {
+  document.getElementById('stockInput').value = ticker;
+  analyzeStock();
+}
+
+document.getElementById('stockInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') analyzeStock();
+});
+
+let stepTimer = null;
+function showLoading() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('searchBtn').disabled = true;
+
+  const steps = ['step1','step2','step3','step4'];
+  steps.forEach(s => document.getElementById(s).classList.remove('active'));
+  let i = 0;
+  document.getElementById(steps[0]).classList.add('active');
+  stepTimer = setInterval(() => {
+    i = Math.min(i + 1, steps.length - 1);
+    steps.forEach(s => document.getElementById(s).classList.remove('active'));
+    document.getElementById(steps[i]).classList.add('active');
+  }, 3500);
+}
+
+function hideLoading() {
+  clearInterval(stepTimer);
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('searchBtn').disabled = false;
+}
+
+async function analyzeStock() {
+  const ticker = document.getElementById('stockInput').value.trim().toUpperCase();
+  if (!ticker) return;
+
+  showLoading();
+
+  // Step 1: Use web_search tool to get LIVE data first
+  const searchPrompt = `Search for the latest real-time stock data for PSX (Pakistan Stock Exchange) ticker: ${ticker}
+
+Search for:
+1. "${ticker} PSX stock price today 2026"
+2. "${ticker} Pakistan stock exchange current price"
+3. "${ticker} PSX latest news 2026"
+
+Use the web search tool to get the most current price, 52-week high/low, and recent news. Then return a JSON analysis.`;
+
+  const analysisPrompt = `You are a professional Pakistani stock analyst. You have just searched the web and found live data for PSX ticker: ${ticker}
+
+Using the live web search results above, extract the REAL current price, 52-week high/low, and recent news. Do NOT use your training data for prices — only use what you found in the search results.
+
+Return ONLY this JSON (no markdown, no extra text):
+
+{
+  "ticker": "${ticker}",
+  "company_name": "Full Company Name from search results",
+  "sector": "Sector",
+  "current_price": 0.0,
+  "price_change_pct": 0.0,
+  "price_change_abs": 0.0,
+  "week52_high": 0.0,
+  "week52_low": 0.0,
+  "current_vs_52w_pct": 50,
+  "market_cap": "PKR XB",
+  "pe_ratio": 0.0,
+  "forward_pe": 0.0,
+  "eps_ttm": 0.0,
+  "dividend_yield": 0.0,
+  "revenue_ttm": "PKR XB",
+  "revenue_growth": 0.0,
+  "net_profit": "PKR XB",
+  "profit_margin": 0.0,
+  "roe": 0.0,
+  "debt_equity": 0.0,
+  "peg_ratio": 0.0,
+  "analyst_target": 0.0,
+  "data_note": "Price as of [date from search results]",
+  "fundamentals_layman": [
+    {
+      "name": "Is it cheap or expensive?",
+      "value": "P/E: Xx",
+      "explanation": "Plain English explanation using actual numbers from search."
+    },
+    {
+      "name": "Is the company growing?",
+      "value": "Revenue +X%",
+      "explanation": "Plain English explanation."
+    },
+    {
+      "name": "How profitable is it?",
+      "value": "Margin: X%",
+      "explanation": "Plain English explanation."
+    },
+    {
+      "name": "Is the company in debt?",
+      "value": "D/E: X",
+      "explanation": "Plain English explanation."
+    },
+    {
+      "name": "Return on your investment",
+      "value": "ROE: X%",
+      "explanation": "Plain English, compare to bank deposit rates in Pakistan (~17-20% currently)."
+    },
+    {
+      "name": "Future earnings value",
+      "value": "PEG: X",
+      "explanation": "Plain English explanation."
+    }
+  ],
+  "news_sentiment": {
+    "overall": "bullish",
+    "bull_pct": 60,
+    "bear_pct": 25,
+    "neutral_pct": 15,
+    "items": [
+      {
+        "headline": "Real headline from search results",
+        "sentiment": "bullish",
+        "source": "Source name"
+      },
+      {
+        "headline": "Real headline from search results",
+        "sentiment": "bearish",
+        "source": "Source name"
+      },
+      {
+        "headline": "Real headline from search results",
+        "sentiment": "neutral",
+        "source": "Source name"
+      }
+    ]
+  },
+  "projections": {
+    "bear": { "price": 0.0, "return_pct": 0.0, "timeframe": "12 months", "scenario": "Realistic bear scenario" },
+    "base": { "price": 0.0, "return_pct": 0.0, "timeframe": "12 months", "scenario": "Most likely scenario" },
+    "bull": { "price": 0.0, "return_pct": 0.0, "timeframe": "12 months", "scenario": "Optimistic scenario" }
+  },
+  "verdict": "BUY",
+  "verdict_confidence": 70,
+  "verdict_reasoning": "2-3 sentence verdict using real data from search results. Reference the actual current price.",
+  "checklist": [
+    { "label": "Trading below analyst target price", "status": "pass" },
+    { "label": "P/E below sector average", "status": "pass" },
+    { "label": "Revenue growing year-on-year", "status": "pass" },
+    { "label": "Debt levels manageable", "status": "pass" },
+    { "label": "News sentiment broadly positive", "status": "pass" },
+    { "label": "ROE competitive vs bank deposits", "status": "warn" },
+    { "label": "Price near 52-week low (entry opportunity)", "status": "pass" },
+    { "label": "Dividend yield vs deposit rate", "status": "warn" }
+  ],
+  "valid": true,
+  "invalid_reason": ""
+}
+
+CRITICAL RULES:
+- current_price MUST come from web search results, not training data
+- current_vs_52w_pct = ((current_price - week52_low) / (week52_high - week52_low)) * 100
+- projection prices must be calculated from the REAL current_price you found
+- news items must be real recent headlines from search, not invented
+- If ticker is invalid/not found on PSX, set valid=false`;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [
+          {
+            role: 'user',
+            content: `Search for live PSX stock data for ticker: ${ticker}
+
+Do THREE searches:
+1. Search: "${ticker} PSX stock price today"
+2. Search: "${ticker} Pakistan stock exchange 52 week high low"  
+3. Search: "${ticker} PSX news 2026"
+
+After searching, return ONLY a JSON object with this exact structure (no markdown, no extra text):
+
+{
+  "ticker": "${ticker}",
+  "company_name": "Full name",
+  "sector": "Sector",
+  "current_price": 438.0,
+  "price_change_pct": 1.2,
+  "price_change_abs": 5.2,
+  "week52_high": 600.0,
+  "week52_low": 300.0,
+  "current_vs_52w_pct": 46,
+  "market_cap": "PKR 200B",
+  "pe_ratio": 12.5,
+  "forward_pe": 10.0,
+  "eps_ttm": 35.0,
+  "dividend_yield": 3.5,
+  "revenue_ttm": "PKR 50B",
+  "revenue_growth": 8.0,
+  "net_profit": "PKR 8B",
+  "profit_margin": 16.0,
+  "roe": 18.0,
+  "debt_equity": 0.3,
+  "peg_ratio": 0.7,
+  "analyst_target": 520.0,
+  "data_note": "Price as of May 2026",
+  "fundamentals_layman": [
+    {"name": "Is it cheap or expensive?", "value": "P/E: 12.5x", "explanation": "Explanation using real numbers..."},
+    {"name": "Is the company growing?", "value": "Revenue +8%", "explanation": "Explanation..."},
+    {"name": "How profitable is it?", "value": "Margin: 16%", "explanation": "Explanation..."},
+    {"name": "Is the company in debt?", "value": "D/E: 0.3", "explanation": "Explanation..."},
+    {"name": "Return on your investment", "value": "ROE: 18%", "explanation": "Explanation vs Pakistan bank deposit rates..."},
+    {"name": "Future earnings value", "value": "PEG: 0.7", "explanation": "Explanation..."}
+  ],
+  "news_sentiment": {
+    "overall": "bullish",
+    "bull_pct": 60,
+    "bear_pct": 25,
+    "neutral_pct": 15,
+    "items": [
+      {"headline": "Real headline from search", "sentiment": "bullish", "source": "Source"},
+      {"headline": "Real headline from search", "sentiment": "bearish", "source": "Source"},
+      {"headline": "Real headline from search", "sentiment": "neutral", "source": "Source"}
+    ]
+  },
+  "projections": {
+    "bear": {"price": 350.0, "return_pct": -20.1, "timeframe": "12 months", "scenario": "Bear scenario description"},
+    "base": {"price": 520.0, "return_pct": 18.7, "timeframe": "12 months", "scenario": "Base scenario description"},
+    "bull": {"price": 650.0, "return_pct": 48.4, "timeframe": "12 months", "scenario": "Bull scenario description"}
+  },
+  "verdict": "BUY",
+  "verdict_confidence": 72,
+  "verdict_reasoning": "2-3 sentence reasoning using real searched data and actual current price.",
+  "checklist": [
+    {"label": "Trading below analyst target price", "status": "pass"},
+    {"label": "P/E below sector average", "status": "pass"},
+    {"label": "Revenue growing year-on-year", "status": "pass"},
+    {"label": "Debt levels manageable", "status": "pass"},
+    {"label": "News sentiment broadly positive", "status": "pass"},
+    {"label": "ROE competitive vs bank deposits (~17%)", "status": "warn"},
+    {"label": "Price near 52-week low (entry opportunity)", "status": "warn"},
+    {"label": "Dividend yield attractive", "status": "warn"}
+  ],
+  "valid": true,
+  "invalid_reason": ""
+}
+
+CRITICAL: Use ONLY prices from your web search results. Do NOT use training data prices. The current_vs_52w_pct must be calculated as: ((current_price - week52_low) / (week52_high - week52_low)) * 100. All projection prices must be based on the real searched current_price.`
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    if (!data.content || !data.content[0]) throw new Error('Empty API response');
+
+    // Extract the text block from response (web_search tool returns multiple content blocks)
+    let raw = '';
+    for (const block of data.content) {
+      if (block.type === 'text' && block.text) {
+        raw += block.text;
+      }
+    }
+
+    raw = raw.replace(/```json|```/g, '').trim();
+
+    // Find JSON in the response
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON found in response');
+
+    const stockData = JSON.parse(jsonMatch[0]);
+    hideLoading();
+
+    if (!stockData.valid) {
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('errorMsg').textContent = stockData.invalid_reason || `Could not find PSX data for "${ticker}". Please check the ticker symbol.`;
+      return;
+    }
+
+    renderResults(stockData);
+
+  } catch(err) {
+    hideLoading();
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('errorMsg').textContent = 'Analysis failed: ' + err.message + '. Please try again.';
+  }
+}
+
+function renderResults(d) {
+  const priceDir = d.price_change_pct >= 0;
+  const verdictClass = d.verdict === 'BUY' ? 'buy' : d.verdict === 'SELL' ? 'sell' : 'hold';
+
+  const html = `
+    <!-- Stock Header -->
+    <div class="stock-header">
+      <div class="stock-name-block">
+        <h2>PSX:${d.ticker}</h2>
+        <div class="company-name">${d.company_name} · ${d.sector}</div>
+        ${d.data_note ? `<div style="margin-top:6px;font-size:10px;color:var(--accent);letter-spacing:0.08em">⟳ ${d.data_note}</div>` : ''}
+      </div>
+      <div class="price-block">
+        <div class="current-price">PKR ${Number(d.current_price).toFixed(2)}</div>
+        <div class="price-change ${priceDir ? 'up' : 'down'}">
+          ${priceDir ? '▲' : '▼'} ${Math.abs(d.price_change_abs).toFixed(2)} (${Math.abs(d.price_change_pct).toFixed(2)}%) today
+        </div>
+      </div>
+    </div>
+
+    <!-- 52 Week Range -->
+    <div class="range-section">
+      <div class="range-label">52-Week Price Range</div>
+      <div class="range-bar-wrap">
+        <div class="range-val low">PKR ${d.week52_low}</div>
+        <div class="range-bar">
+          <div class="range-fill" style="width:${d.current_vs_52w_pct}%"></div>
+          <div class="range-marker" style="left:${d.current_vs_52w_pct}%"></div>
+        </div>
+        <div class="range-val high">PKR ${d.week52_high}</div>
+      </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Market Cap</div>
+        <div class="metric-value">${d.market_cap}</div>
+        <div class="metric-explain">Total company value in stock market</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">EPS (Earnings/Share)</div>
+        <div class="metric-value">PKR ${d.eps_ttm}</div>
+        <div class="metric-explain">Profit earned per each share you hold</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Dividend Yield</div>
+        <div class="metric-value">${d.dividend_yield}%</div>
+        <div class="metric-explain">Annual cash payout as % of share price</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Revenue (TTM)</div>
+        <div class="metric-value">${d.revenue_ttm}</div>
+        <div class="metric-explain">+${d.revenue_growth}% growth vs last year</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Net Profit</div>
+        <div class="metric-value">${d.net_profit}</div>
+        <div class="metric-explain">${d.profit_margin}% profit margin</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Analyst Target</div>
+        <div class="metric-value" style="color:var(--accent)">PKR ${d.analyst_target}</div>
+        <div class="metric-explain">Average 12-month price target</div>
+      </div>
+    </div>
+
+    <!-- Fundamentals in Layman Terms -->
+    <div class="section">
+      <div class="section-title">Fundamentals — Plain English</div>
+      <div class="fundamentals-list">
+        ${d.fundamentals_layman.map(f => `
+          <div class="fund-item">
+            <div class="fund-name">${f.name}<br><strong style="color:var(--accent2);font-size:12px">${f.value}</strong></div>
+            <div class="fund-explain">${f.explanation}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- News Sentiment -->
+    <div class="section">
+      <div class="section-title">News & Investor Sentiment</div>
+      <div class="sentiment-meter">
+        <span class="sentiment-label" style="color:var(--accent)">Bullish ${d.news_sentiment.bull_pct}%</span>
+        <div class="sentiment-bar">
+          <div class="sent-bull-fill" style="width:${d.news_sentiment.bull_pct}%"></div>
+          <div class="sent-bear-fill" style="width:${d.news_sentiment.bear_pct}%"></div>
+        </div>
+        <span class="sentiment-label" style="color:var(--danger);text-align:right">Bearish ${d.news_sentiment.bear_pct}%</span>
+      </div>
+      <div class="news-list">
+        ${d.news_sentiment.items.map(n => `
+          <div class="news-item ${n.sentiment}">
+            <div class="news-headline">${n.headline}</div>
+            <div class="news-meta">
+              <span class="news-source">${n.source}</span>
+              <span class="news-sentiment-badge sentiment-${n.sentiment === 'bullish' ? 'bull' : n.sentiment === 'bearish' ? 'bear' : 'neutral'}">
+                ${n.sentiment}
+              </span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Price Projections -->
+    <div class="section">
+      <div class="section-title">12-Month Price Scenarios</div>
+      <div class="projection-grid">
+        <div class="proj-card bear">
+          <div class="proj-scenario">🐻 Bear Case</div>
+          <div class="proj-price">PKR ${d.projections.bear.price}</div>
+          <div class="proj-return" style="color:var(--danger)">${d.projections.bear.return_pct}% return</div>
+          <div class="proj-timeframe">${d.projections.bear.scenario}</div>
+        </div>
+        <div class="proj-card base">
+          <div class="proj-scenario">📊 Base Case</div>
+          <div class="proj-price">PKR ${d.projections.base.price}</div>
+          <div class="proj-return" style="color:var(--accent2)">+${d.projections.base.return_pct}% return</div>
+          <div class="proj-timeframe">${d.projections.base.scenario}</div>
+        </div>
+        <div class="proj-card bull">
+          <div class="proj-scenario">🐂 Bull Case</div>
+          <div class="proj-price">PKR ${d.projections.bull.price}</div>
+          <div class="proj-return" style="color:var(--accent)">+${d.projections.bull.return_pct}% return</div>
+          <div class="proj-timeframe">${d.projections.bull.scenario}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verdict -->
+    <div class="verdict-card ${verdictClass}">
+      <div class="verdict-inner">
+        <div class="verdict-stamp">${d.verdict}</div>
+        <div class="verdict-details">
+          <div class="verdict-confidence">Conviction Level — ${d.verdict_confidence}%</div>
+          <div class="confidence-bar">
+            <div class="confidence-fill" style="width:${d.verdict_confidence}%"></div>
+          </div>
+          <div class="verdict-reasoning">${d.verdict_reasoning}</div>
+          <div class="checklist">
+            ${d.checklist.map(c => `
+              <div class="check-item">
+                <span class="check-icon ${c.status}">${c.status === 'pass' ? '✓' : c.status === 'fail' ? '✗' : '~'}</span>
+                <span>${c.label}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const resultsEl = document.getElementById('results');
+  resultsEl.innerHTML = html;
+  resultsEl.style.display = 'block';
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+</body>
+</html>

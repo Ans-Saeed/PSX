@@ -1,0 +1,15 @@
+{
+  "name": "psx-research",
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "scrape": "node scripts/scraper.js",
+    "scrape:top50": "SYMBOLS=top50 node scripts/scraper.js",
+    "dev": "vercel dev"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vercel": "^37.0.0"
+  },
+  "engines": { "node": ">=20" }
+}

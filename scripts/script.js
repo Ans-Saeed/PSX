@@ -75,122 +75,110 @@ function qs(ticker) {
 //     the stock from price history + sector knowledge
 //  3. Always fall back gracefully to seed data
 // ═══════════════════════════════════════════════════════
+// fetchRealFundamentals.js
+// Drop-in replacement for the AI-based fundamentals fetcher in script.js
+// Paste this block into script.js replacing the old fetchFundamentalsViaAI / fetchRealFundamentals functions
+
+// ═══════════════════════════════════════════════════════
+//  REAL FUNDAMENTALS — from cached /api/fundamentals
+//  Replaces: fetchFundamentalsViaAI()
+// ═══════════════════════════════════════════════════════
+
 async function fetchRealFundamentals(symbol, priceData, seedData) {
-  // Step 1: Try PSX Financial portal via our API
+  let cached = null;
+
+  // 1. Try /api/fundamentals (cached, fast)
   try {
-    const res = await fetch(`/api/psx?financials=${symbol}`);
+    const res = await fetch(`/api/fundamentals?symbol=${symbol}`);
     if (res.ok) {
-      const data = await res.json();
-      if (data && data.eps && !data.note) {
-        // Got real data — merge with seed for any missing fields
-        return {
-          ...seedData,
-          ...cleanFundamentals(data),
-          name: seedData?.name || symbol,
-          sector: seedData?.sector || 'Energy',
-          dataSource: 'PSX Financial Portal',
-          isReal: true,
-        };
-      }
+      const json = await res.json();
+      if (json && !json.error) cached = json;
     }
-  } catch (e) {
-    console.warn('PSX financials API failed:', e.message);
+  } catch { /* fall through */ }
+
+  // 2. If no cached data, try fetching financials live (psx portal direct)
+  if (!cached || cached.dataQuality === "partial") {
+    try {
+      const res = await fetch(`https://financials.psx.com.pk/financials/annual/${symbol}`, {
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest", Referer: "https://financials.psx.com.pk/" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const latest = json?.data?.[0];
+        if (latest) {
+          const liveData = {
+            eps:          parseFloat(latest.eps)           || null,
+            bvps:         parseFloat(latest.bvps)          || null,
+            roe:          parseFloat(latest.roe)           || null,
+            debtEq:       parseFloat(latest.debt_equity)   || null,
+            profitMargin: parseFloat(latest.profit_margin) || null,
+            divPerShare:  parseFloat(latest.dividend_per_share) || 0,
+            year:         latest.year || null,
+            dataSource:   "psx_portal_live",
+            dataQuality:  "real",
+          };
+          // Revenue growth from previous year
+          const prev = json.data[1];
+          if (prev?.revenue && latest.revenue) {
+            const r1 = parseFloat(latest.revenue), r2 = parseFloat(prev.revenue);
+            if (r1 && r2) liveData.revenueGrowth = ((r1 - r2) / Math.abs(r2)) * 100;
+          }
+          cached = { ...(cached || {}), ...liveData };
+        }
+      }
+    } catch { /* fall through */ }
   }
 
-  // Step 2: Use Claude API to derive fundamentals from price data + context
+  // 3. Build final fundamentals object
+  const price = priceData?.[0]?.close || null;
+  const eps = cached?.eps || null;
+  const bvps = cached?.bvps || null;
+  const divPerShare = cached?.divPerShare || 0;
+
+  const pe = cached?.pe || (price && eps ? price / eps : null);
+  const divY = cached?.divY || (price && divPerShare ? (divPerShare / price) * 100 : null);
+
+  const sector = cached?.sector || seedData?.sector || "Energy";
+  const name = cached?.name || seedData?.name || symbol;
+
+  const dataQuality = cached?.dataQuality || (eps ? "real" : "unavailable");
+  const dataSource = cached?.dataSource || "unavailable";
+
+  return {
+    name,
+    sector,
+    eps,
+    pe,
+    bvps,
+    roe:          cached?.roe          || null,
+    divY,
+    divPerShare,
+    debtEq:       cached?.debtEq       || null,
+    profitMargin: cached?.profitMargin || null,
+    revenueGrowth:cached?.revenueGrowth|| null,
+    marketCap:    cached?.marketCap    || null,
+    sharesOut:    cached?.sharesOut    || null,
+    dataQuality,
+    dataSource,
+    lastUpdated:  cached?.lastUpdated  || null,
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+//  NEWS — from /api/news (RSS aggregation)
+// ═══════════════════════════════════════════════════════
+
+async function fetchNews(symbol, sector) {
   try {
-    const claudeFundamentals = await fetchFundamentalsViaAI(symbol, priceData, seedData);
-    if (claudeFundamentals) return claudeFundamentals;
-  } catch (e) {
-    console.warn('Claude fundamentals failed:', e.message);
-  }
-
-  // Step 3: Fall back to seed data
-  return {
-    ...(seedData || { name: symbol, sector: 'Energy' }),
-    dataSource: 'Reference Data (Verify with Latest Filing)',
-    isReal: false,
-  };
+    const res = await fetch(`/api/news?q=${symbol}&sector=${encodeURIComponent(sector || "")}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.articles?.length) return { articles: json.articles, isFallback: json.fallback || false };
+    }
+  } catch { /* fall through */ }
+  return { articles: generateLocalFallbackNews(symbol, sector), isFallback: true };
 }
 
-// Use Claude AI to intelligently derive/validate fundamentals
-async function fetchFundamentalsViaAI(symbol, priceData, seedData) {
-  // Build price context from last 12 months of EOD data
-  const last252 = priceData.slice(0, 252); // ~1 year trading days
-  const currentPrice = last252[0]?.close;
-  const yearAgoPrice = last252[last252.length - 1]?.close;
-  const high52 = Math.max(...last252.map(d => d.close));
-  const low52 = Math.min(...last252.map(d => d.close));
-  const avgVol = last252.reduce((a,b)=>a+b.volume,0)/last252.length;
-  const priceReturn = yearAgoPrice ? ((currentPrice-yearAgoPrice)/yearAgoPrice*100).toFixed(1) : 'N/A';
-
-  const sectorName = seedData?.sector || 'Energy';
-  const sectorBench = SECTOR_BENCHMARKS[sectorName] || SECTOR_BENCHMARKS.Energy;
-
-  const prompt = `You are a Pakistan stock market analyst with deep knowledge of PSX-listed companies and their financial filings. 
-
-Analyze ${symbol} (${seedData?.name || symbol}), a ${sectorName} sector company on PSX.
-
-Current market data:
-- Current Price: PKR ${f2(currentPrice)}
-- 52-week High: PKR ${f2(high52)}, Low: PKR ${f2(low52)}
-- 1-year price return: ${priceReturn}%
-- Average daily volume: ${fmtVol(Math.round(avgVol))}
-
-Sector benchmarks for ${sectorName} on PSX:
-- Avg P/E: ${sectorBench.pe}x, Avg ROE: ${sectorBench.roe}%, Avg Div Yield: ${sectorBench.divY}%
-- Avg Debt/Equity: ${sectorBench.debtEq}x, Avg Profit Margin: ${sectorBench.margin}%
-
-PSX market benchmarks:
-- Policy Rate (SBP): ${PSX_BENCHMARKS.riskFreeRate}%, Market Avg P/E: ${PSX_BENCHMARKS.avgPE}x
-
-Reference financial data (from last known filing — may need updating):
-${JSON.stringify({ pe: seedData?.pe, eps: seedData?.eps, roe: seedData?.roe, bvps: seedData?.bvps, debtEq: seedData?.debtEq, profitMargin: seedData?.profitMargin, divY: seedData?.divY, revenueGrowth: seedData?.revenueGrowth })}
-
-Based on your knowledge of ${symbol}'s financial history and the above market data, provide your BEST ESTIMATE of the current fundamental metrics. Be honest about uncertainty.
-
-Respond ONLY with a valid JSON object, no markdown, no explanation:
-{
-  "eps": <number or null>,
-  "bvps": <number or null>,
-  "roe": <number or null>,
-  "debtEq": <number or null>,
-  "profitMargin": <number or null>,
-  "revenueGrowth": <number or null>,
-  "divY": <number or null>,
-  "pe": <number or null>,
-  "confidence": "high|medium|low",
-  "dataNote": "<brief note about data quality, max 100 chars>"
-}`;
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 500,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  if (!response.ok) throw new Error('Claude API error: ' + response.status);
-  const data = await response.json();
-  const text = data.content?.find(b=>b.type==='text')?.text || '';
-
-  // Parse JSON from Claude's response
-  const cleaned = text.replace(/```json?/g,'').replace(/```/g,'').trim();
-  const parsed = JSON.parse(cleaned);
-
-  return {
-    ...seedData,
-    ...cleanFundamentals(parsed),
-    name: seedData?.name || symbol,
-    sector: seedData?.sector || 'Energy',
-    dataSource: `AI Analysis (${parsed.confidence || 'medium'} confidence)`,
-    dataNote: parsed.dataNote || '',
-    isReal: parsed.confidence === 'high',
-  };
-}
 
 function cleanFundamentals(data) {
   const out = {};
@@ -434,16 +422,7 @@ function getHistoricalPrices(data) {
 // ═══════════════════════════════════════════════════════
 //  NEWS — RSS via /api/psx?news=true
 // ═══════════════════════════════════════════════════════
-async function fetchNews(symbol, sector) {
-  try {
-    const res = await fetch(`/api/psx?news=true&q=${encodeURIComponent(symbol)}&sector=${encodeURIComponent(sector)}`);
-    if (!res.ok) throw new Error('News API failed');
-    const json = await res.json();
-    return { articles: json.articles || [], isFallback: json.fallback };
-  } catch (err) {
-    return { articles: generateLocalFallbackNews(symbol, sector), isFallback: true };
-  }
-}
+
 
 function generateLocalFallbackNews(symbol, sector) {
   const today = new Date().toISOString();

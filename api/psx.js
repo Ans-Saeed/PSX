@@ -81,7 +81,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch EOD price data
+    // Fetch EOD price data from PSX
     const priceRes = await fetch(
       `https://dps.psx.com.pk/timeseries/eod/${symbol}`,
       { headers: { 'Accept': 'application/json' }, timeout: 15000 }
@@ -96,20 +96,31 @@ export default async function handler(req, res) {
     // Get latest price for calculations
     const latestPrice = priceData.data && priceData.data.length > 0 ? priceData.data[0][1] : 0;
 
-    // Fetch company page for fundamentals (HTML scraping)
+    // Fetch fundamentals from Investify.pk API
     let fundamentals = null;
     try {
-      const companyRes = await fetch(`https://dps.psx.com.pk/company/${symbol}`, {
-        headers: { 'Accept': 'text/html' },
+      const investifyRes = await fetch(`https://investify.pk/api/stock/${symbol}/fundamentals`, {
+        headers: { 'Accept': 'application/json' },
         timeout: 10000
       });
 
-      if (companyRes.ok) {
-        const html = await companyRes.text();
-        fundamentals = scrapeFundamentals(html, symbol, latestPrice);
+      if (investifyRes.ok) {
+        const investifyData = await investifyRes.json();
+        fundamentals = parseInvestifyFundamentals(investifyData, symbol, latestPrice);
+      } else {
+        // Try sarmaya.pk as backup
+        const sarmayaRes = await fetch(`https://sarmaya.pk/api/stock/${symbol}`, {
+          headers: { 'Accept': 'application/json' },
+          timeout: 10000
+        });
+
+        if (sarmayaRes.ok) {
+          const sarmayaData = await sarmayaRes.json();
+          fundamentals = parseSarmayaFundamentals(sarmayaData, symbol, latestPrice);
+        }
       }
     } catch (e) {
-      console.log('Fundamentals scrape failed:', e.message);
+      console.log('Fundamentals API failed:', e.message);
     }
 
     res.status(200).json({
@@ -123,139 +134,86 @@ export default async function handler(req, res) {
   }
 }
 
-// Scrape fundamentals from PSX company page HTML
-function scrapeFundamentals(html, symbol, currentPrice) {
+// Parse Investify.pk fundamentals data
+function parseInvestifyFundamentals(data, symbol, currentPrice) {
   const f = {};
 
-  // Extract company name from title
-  const nameMatch = html.match(/<title>([^<]+)\s+-\s+PSX<\/title>/i);
-  if (nameMatch) {
-    f.name = nameMatch[1].replace(/\s+/g, ' ').trim();
-  }
+  if (!data || typeof data !== 'object') return f;
 
-  // Extract sector from page content
-  const sectorMap = {
-    'OIL & GAS EXPLORATION': 'Energy',
-    'OIL & GAS MARKETING': 'Energy',
-    'BANKING': 'Banking',
-    'CEMENT': 'Cement',
-    'FERTILIZER': 'Fertilizer',
-    'POWER': 'Power',
-    'TEXTILE': 'Textile',
-    'TELECOM': 'Telecom',
-    'FOOD & PERSONAL': 'Consumer'
-  };
+  // Investify returns data in various formats - handle common structures
+  // Format 1: { eps: 29.47, pe: 6.72, roe: 10.97, ... }
+  if (data.eps !== undefined) f.eps = parseFloat(data.eps);
+  if (data.pe !== undefined) f.pe = parseFloat(data.pe);
+  if (data.roe !== undefined) f.roe = parseFloat(data.roe);
+  if (data.roa !== undefined) f.roa = parseFloat(data.roa);
+  if (data.bvps !== undefined) f.bvps = parseFloat(data.bvps);
+  if (data.dps !== undefined) f.dps = parseFloat(data.dps);
+  if (data.divYield !== undefined) f.divY = parseFloat(data.divYield);
+  if (data.debtEquity !== undefined) f.debtEq = parseFloat(data.debtEquity);
+  if (data.profitMargin !== undefined) f.profitMargin = parseFloat(data.profitMargin);
+  if (data.revenueGrowth !== undefined) f.revenueGrowth = parseFloat(data.revenueGrowth);
+  if (data.sector !== undefined) f.sector = data.sector;
+  if (data.name !== undefined) f.name = data.name;
 
-  for (const [key, value] of Object.entries(sectorMap)) {
-    if (html.includes(key)) {
-      f.sector = value;
-      break;
-    }
-  }
+  // Format 2: Nested under 'data' or 'fundamentals'
+  const nested = data.data || data.fundamentals || data.result || {};
+  if (nested.eps !== undefined && !f.eps) f.eps = parseFloat(nested.eps);
+  if (nested.pe !== undefined && !f.pe) f.pe = parseFloat(nested.pe);
+  if (nested.roe !== undefined && !f.roe) f.roe = parseFloat(nested.roe);
+  if (nested.bvps !== undefined && !f.bvps) f.bvps = parseFloat(nested.bvps);
+  if (nested.dps !== undefined && !f.dps) f.dps = parseFloat(nested.dps);
+  if (nested.divYield !== undefined && !f.divY) f.divY = parseFloat(nested.divYield);
+  if (nested.debtEquity !== undefined && !f.debtEq) f.debtEq = parseFloat(nested.debtEquity);
+  if (nested.profitMargin !== undefined && !f.profitMargin) f.profitMargin = parseFloat(nested.profitMargin);
+  if (nested.revenueGrowth !== undefined && !f.revenueGrowth) f.revenueGrowth = parseFloat(nested.revenueGrowth);
+  if (nested.sector !== undefined && !f.sector) f.sector = nested.sector;
+  if (nested.name !== undefined && !f.name) f.name = nested.name;
 
-  // Extract from Financials table - find the row with EPS
-  // Pattern: | 2025 | 242,516,363 | 92,027,450 | 33.82 |
-  const financialsMatch = html.match(/\|\s*(\d{4})\s*\|\s*([\d,]+)\s*\|\s*([\d,]+)\s*\|\s*([\d.]+)\s*\|/);
-  if (financialsMatch) {
-    f.eps = parseFloat(financialsMatch[4]); // EPS is the 4th column
-    f.sales = parseFloat(financialsMatch[2].replace(/,/g, ''));
-    f.profitAfterTax = parseFloat(financialsMatch[3].replace(/,/g, ''));
-  }
-
-  // Try quarterly EPS if annual not found
-  if (!f.eps) {
-    const qMatch = html.match(/Q3\s+2026\s*\|\s*[\d,]+\s*\|\s*[\d,]+\s*\|\s*([\d.]+)\s*\|/);
-    if (qMatch) {
-      f.eps = parseFloat(qMatch[1]);
-      f.isQuarterly = true;
-    }
-  }
-
-  // Extract from Ratios table
-  // Pattern: | 2025 | 62.59 | 37.95 | (19.50) | (0.26) |
-  const ratiosMatch = html.match(/\|\s*(\d{4})\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*\(?([\d.()-]+)\)?\s*\|\s*\(?([\d.()-]+)\)?\s*\|/);
-  if (ratiosMatch) {
-    f.grossMargin = parseFloat(ratiosMatch[2]);
-    f.profitMargin = parseFloat(ratiosMatch[3]);
-    f.epsGrowth = parseFloat(ratiosMatch[4].replace(/[()]/g, ''));
-    f.peg = parseFloat(ratiosMatch[5].replace(/[()]/g, ''));
-  }
-
-  // Extract Market Cap
-  const mcapMatch = html.match(/Market\s+Cap\s*\(000's\)\s*([\d,.]+)/i);
-  if (mcapMatch) {
-    f.marketCap = parseFloat(mcapMatch[1].replace(/,/g, ''));
-  }
-
-  // Calculate P/E from current price and EPS
-  if (f.eps && currentPrice > 0) {
+  // Calculate missing metrics from available data
+  if (!f.pe && f.eps && currentPrice > 0) {
     f.pe = currentPrice / f.eps;
   }
 
-  // Try to extract Book Value per Share from page
-  const bvpsMatch = html.match(/Book\s+Value\s+per\s+Share\s*\(?Rs\.?\)?\s*([\d,.]+)/i);
-  if (bvpsMatch) {
-    f.bvps = parseFloat(bvpsMatch[1].replace(/,/g, ''));
+  if (!f.divY && f.dps && currentPrice > 0) {
+    f.divY = (f.dps / currentPrice) * 100;
   }
 
-  // Try to extract Dividend per Share
-  const dpsMatch = html.match(/Dividend\s+per\s+Share\s*\(?Rs\.?\)?\s*([\d.]+)/i);
-  if (dpsMatch) {
-    f.dps = parseFloat(dpsMatch[1]);
-    if (currentPrice > 0) {
-      f.divY = (f.dps / currentPrice) * 100;
-    }
+  if (!f.roe && f.eps && f.bvps && f.bvps > 0) {
+    // ROE ≈ EPS / BVPS (simplified)
+    f.roe = (f.eps / f.bvps) * 100;
   }
 
-  // Try to extract ROE
-  const roeMatch = html.match(/Return\s+on\s+Equity\s*([\d.]+)/i);
-  if (roeMatch) {
-    f.roe = parseFloat(roeMatch[1]);
+  return f;
+}
+
+// Parse Sarmaya.pk fundamentals data
+function parseSarmayaFundamentals(data, symbol, currentPrice) {
+  const f = {};
+
+  if (!data || typeof data !== 'object') return f;
+
+  // Sarmaya returns data in various formats
+  const stock = data.stock || data.data || data;
+
+  if (stock.eps !== undefined) f.eps = parseFloat(stock.eps);
+  if (stock.pe !== undefined) f.pe = parseFloat(stock.pe);
+  if (stock.roe !== undefined) f.roe = parseFloat(stock.roe);
+  if (stock.bvps !== undefined) f.bvps = parseFloat(stock.bvps);
+  if (stock.dps !== undefined) f.dps = parseFloat(stock.dps);
+  if (stock.divYield !== undefined) f.divY = parseFloat(stock.divYield);
+  if (stock.debtEquity !== undefined) f.debtEq = parseFloat(stock.debtEquity);
+  if (stock.profitMargin !== undefined) f.profitMargin = parseFloat(stock.profitMargin);
+  if (stock.revenueGrowth !== undefined) f.revenueGrowth = parseFloat(stock.revenueGrowth);
+  if (stock.sector !== undefined) f.sector = stock.sector;
+  if (stock.name !== undefined) f.name = stock.name;
+
+  // Calculate missing metrics
+  if (!f.pe && f.eps && currentPrice > 0) {
+    f.pe = currentPrice / f.eps;
   }
 
-  // Try to extract ROA
-  const roaMatch = html.match(/Return\s+on\s+Assets\s*([\d.]+)/i);
-  if (roaMatch) {
-    f.roa = parseFloat(roaMatch[1]);
-  }
-
-  // Try to extract Debt to Equity
-  const deMatch = html.match(/Debt\s+to\s+Equity\s*([\d.]+)/i);
-  if (deMatch) {
-    f.debtEq = parseFloat(deMatch[1]);
-  }
-
-  // Try to extract Current Ratio
-  const crMatch = html.match(/Current\s+Ratio\s*\(?Times\)?\s*([\d.]+)/i);
-  if (crMatch) {
-    f.currentRatio = parseFloat(crMatch[1]);
-  }
-
-  // Try to extract Interest Cover
-  const icMatch = html.match(/Interest\s+Cover\s*\(?Times\)?\s*([\d.]+)/i);
-  if (icMatch) {
-    f.interestCover = parseFloat(icMatch[1]);
-  }
-
-  // Calculate ROE from Profit/Equity if we have the data
-  if (!f.roe && f.profitAfterTax && f.bvps) {
-    // Estimate shares outstanding from market cap / price
-    if (f.marketCap && currentPrice > 0) {
-      const sharesOutstanding = f.marketCap / currentPrice;
-      const totalEquity = f.bvps * sharesOutstanding;
-      f.roe = (f.profitAfterTax / totalEquity) * 100;
-    }
-  }
-
-  // Estimate revenue growth from sales data if available
-  if (f.sales) {
-    const prevSalesMatch = html.match(/\|\s*2024\s*\|\s*([\d,]+)\s*\|/);
-    if (prevSalesMatch) {
-      const prevSales = parseFloat(prevSalesMatch[1].replace(/,/g, ''));
-      if (prevSales > 0) {
-        f.revenueGrowth = ((f.sales - prevSales) / prevSales) * 100;
-      }
-    }
+  if (!f.divY && f.dps && currentPrice > 0) {
+    f.divY = (f.dps / currentPrice) * 100;
   }
 
   return f;

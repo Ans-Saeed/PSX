@@ -280,48 +280,68 @@ async function analyzeStock() {
     let f = json.fundamentals || {};
     const fallback = FUNDAMENTALS_FALLBACK[raw] || { name: raw, sector: 'Energy' };
 
+    console.log('Scraped fundamentals:', f);
+    console.log('Fallback fundamentals:', fallback);
+
     // Merge: scraped values take priority, fallback fills gaps
+    // Use nullish coalescing (??) instead of OR (||) to handle 0 values correctly
     f = {
-      name: f.name || fallback.name,
-      sector: f.sector || fallback.sector,
-      pe: f.pe || fallback.pe,
-      eps: f.eps || fallback.eps,
-      divY: f.divY || fallback.divY,
-      roe: f.roe || fallback.roe,
-      bvps: f.bvps || fallback.bvps,
-      debtEq: f.debtEq !== undefined ? f.debtEq : fallback.debtEq,
-      profitMargin: f.profitMargin !== undefined ? f.profitMargin : fallback.profitMargin,
-      revenueGrowth: f.revenueGrowth !== undefined ? f.revenueGrowth : fallback.revenueGrowth,
+      name: f.name ?? fallback.name,
+      sector: f.sector ?? fallback.sector,
+      pe: f.pe ?? fallback.pe,
+      eps: f.eps ?? fallback.eps,
+      divY: f.divY ?? fallback.divY,
+      roe: f.roe ?? fallback.roe,
+      bvps: f.bvps ?? fallback.bvps,
+      debtEq: f.debtEq ?? fallback.debtEq,
+      profitMargin: f.profitMargin ?? fallback.profitMargin,
+      revenueGrowth: f.revenueGrowth ?? fallback.revenueGrowth,
     };
 
     // Calculate P/E from price + EPS if we have EPS but no P/E
-    if (!f.pe && f.eps && f.eps > 0) {
+    if (!f.pe && f.eps && f.eps > 0 && price > 0) {
       f.pe = price / f.eps;
     }
     // Calculate EPS from price + P/E if we have P/E but no EPS
-    if (!f.eps && f.pe && f.pe > 0) {
+    if (!f.eps && f.pe && f.pe > 0 && price > 0) {
       f.eps = price / f.pe;
     }
-    // Calculate Dividend Yield from DPS if available
-    if (!f.divY && f.dps && f.dps > 0) {
-      f.divY = (f.dps / price) * 100;
+    // Calculate Dividend Yield from DPS if available from scraping
+    if (!f.divY && json.fundamentals?.dps && price > 0) {
+      f.divY = (json.fundamentals.dps / price) * 100;
     }
-
-    const pe = f.pe ?? null;
-    const eps = f.eps ?? null;
-    const divY = f.divY ?? 0;
-    const roe = f.roe ?? null;
-    const bvps = f.bvps ?? null;
-    const debtEq = f.debtEq ?? null;
-    const profitMargin = f.profitMargin ?? null;
-    const revenueGrowth = f.revenueGrowth ?? null;
-    const sector = f.sector || 'Energy';
-
-    const fairValue = calculateFairValue({ pe, eps, divY, roe, bvps, revenueGrowth, profitMargin }, price);
-    const history = getHistoricalPrices(data);
-
-    updateLoaderStep(4, 'Fetching news…');
-    const news = await fetchNews(raw, sector);
+    // Estimate div yield if still missing
+    if (!f.divY && f.eps && price > 0) {
+      const payoutRatio = 0.5;
+      f.divY = ((f.eps * payoutRatio) / price) * 100;
+    }
+    // Calculate BVPS from market cap + equity if available
+    if (!f.bvps && json.fundamentals?.marketCap && price > 0 && json.fundamentals?.profitAfterTax && f.roe) {
+      try {
+        const sharesOutstanding = json.fundamentals.marketCap / price;
+        const totalEquity = (json.fundamentals.profitAfterTax / f.roe) * 100;
+        if (sharesOutstanding > 0) {
+          f.bvps = totalEquity / sharesOutstanding;
+        }
+      } catch (e) { /* ignore calc errors */ }
+    }
+    // Calculate ROE from profit/equity if we have the data
+    if (!f.roe && json.fundamentals?.profitAfterTax && f.bvps && price > 0) {
+      try {
+        const mcap = json.fundamentals.marketCap || (price * 1000000);
+        const sharesOutstanding = mcap / price;
+        const totalEquity = f.bvps * sharesOutstanding;
+        if (totalEquity > 0) {
+          f.roe = (json.fundamentals.profitAfterTax / totalEquity) * 100;
+        }
+      } catch (e) { /* ignore calc errors */ }
+    }
+    // Calculate revenue growth from sales data if available
+    if (!f.revenueGrowth && json.fundamentals?.sales && json.fundamentals?.prevSales) {
+      try {
+        f.revenueGrowth = ((json.fundamentals.sales - json.fundamentals.prevSales) / json.fundamentals.prevSales) * 100;
+      } catch (e) { /* ignore calc errors */ }
+    }
 
     // ===== FUNDAMENTAL SCORING =====
     let score = 0;
@@ -427,7 +447,7 @@ async function analyzeStock() {
         <div class="stock-name-block">
           <h2>PSX:${raw}</h2>
           <div class="company-name">${f.name}</div>
-          <div class="data-note">⟳ Live via PSX · ${fmtDate(latest.timestamp)} · ${sector} Sector</div>
+          <div class="data-note">⟳ Live via PSX · ${fmtDate(latest.timestamp)} · ${sector} Sector ${json.scrapeError ? '· ⚠ Fundamentals: Fallback' : '· ✓ Fundamentals: Live'}</div>
         </div>
         <div class="price-block">
           <div class="current-price">PKR ${f2(price)}</div>
@@ -781,13 +801,14 @@ async function analyzeStock() {
     let f = FUNDAMENTALS_FALLBACK[raw] || { name: raw, sector: 'Energy' };
 
     // If API returned scraped fundamentals, merge them (scraped takes priority)
-    if (json.fundamentals) {
+    if (json.fundamentals && Object.keys(json.fundamentals).length > 0) {
       const scraped = json.fundamentals;
+      console.log('Scraped fundamentals:', scraped);
+
       f = {
         ...f,
         name: scraped.name || f.name,
         sector: scraped.sector || f.sector,
-        pe: scraped.pe ?? scraped.eps ? price / scraped.eps : f.pe,
         eps: scraped.eps ?? f.eps,
         divY: scraped.divY ?? f.divY,
         roe: scraped.roe ?? f.roe,
@@ -796,14 +817,37 @@ async function analyzeStock() {
         profitMargin: scraped.profitMargin ?? f.profitMargin,
         revenueGrowth: scraped.revenueGrowth ?? f.revenueGrowth,
       };
+
+      // Calculate P/E from live price + scraped EPS
+      if (scraped.eps && !scraped.pe) {
+        f.pe = price / scraped.eps;
+      } else if (scraped.pe) {
+        f.pe = scraped.pe;
+      }
+
+      // Calculate Div Yield from DPS if available
+      if (scraped.dps && !f.divY) {
+        f.divY = (scraped.dps / price) * 100;
+      }
+
+      // Calculate ROE from PAT and Equity if available
+      if (scraped.profitAfterTax && scraped.sales && !f.roe) {
+        // Rough estimate: ROE ≈ (PAT/Sales) * (Sales/Equity) - simplified
+        // Use profit margin as proxy if we don't have equity
+        if (scraped.profitMargin) {
+          f.roe = scraped.profitMargin * 2.5; // rough estimate for PSX companies
+        }
+      }
+    } else {
+      console.log('No scraped fundamentals, using fallback for', raw);
+      // Calculate P/E from fallback EPS
+      if (f.eps && !f.pe) f.pe = price / f.eps;
     }
 
-    // Calculate P/E from price if EPS exists but PE doesn't
+    // Final calculation pass - ensure all derived values
     if (!f.pe && f.eps) f.pe = price / f.eps;
-    // Calculate Div Yield from price if we have DPS
     if (!f.divY && f.eps) {
-      // Estimate div yield from payout ratio (typical 40-60% for PSX)
-      const payoutRatio = 0.5;
+      const payoutRatio = 0.45; // typical PSX payout
       const dps = f.eps * payoutRatio;
       f.divY = (dps / price) * 100;
     }
@@ -927,7 +971,7 @@ async function analyzeStock() {
         <div class="stock-name-block">
           <h2>PSX:${raw}</h2>
           <div class="company-name">${f.name}</div>
-          <div class="data-note">⟳ Live via PSX · ${fmtDate(latest.timestamp)} · ${sector} Sector</div>
+          <div class="data-note">⟳ Live via PSX · ${fmtDate(latest.timestamp)} · ${sector} Sector ${json.scrapeError ? '· ⚠ Fundamentals: Fallback' : '· ✓ Fundamentals: Live'}</div>
         </div>
         <div class="price-block">
           <div class="current-price">PKR ${f2(price)}</div>

@@ -93,6 +93,9 @@ export default async function handler(req, res) {
 
     const priceData = await priceRes.json();
 
+    // Get latest price for calculations
+    const latestPrice = priceData.data && priceData.data.length > 0 ? priceData.data[0][1] : 0;
+
     // Fetch company page for fundamentals (HTML scraping)
     let fundamentals = null;
     try {
@@ -103,7 +106,7 @@ export default async function handler(req, res) {
 
       if (companyRes.ok) {
         const html = await companyRes.text();
-        fundamentals = scrapeFundamentals(html, symbol);
+        fundamentals = scrapeFundamentals(html, symbol, latestPrice);
       }
     } catch (e) {
       console.log('Fundamentals scrape failed:', e.message);
@@ -121,95 +124,138 @@ export default async function handler(req, res) {
 }
 
 // Scrape fundamentals from PSX company page HTML
-function scrapeFundamentals(html, symbol) {
+function scrapeFundamentals(html, symbol, currentPrice) {
   const f = {};
 
-  // Extract EPS from financial tables
-  const epsMatch = html.match(/EPS\s*<\/td>\s*<td[^>]*>([\d,.]+)<\/td>/i) ||
-                   html.match(/Earnings\s+per\s+Share\s*<\/td>\s*<td[^>]*>([\d,.]+)<\/td>/i);
-  if (epsMatch) {
-    f.eps = parseFloat(epsMatch[1].replace(/,/g, ''));
+  // Extract company name from title
+  const nameMatch = html.match(/<title>([^<]+)\s+-\s+PSX<\/title>/i);
+  if (nameMatch) {
+    f.name = nameMatch[1].replace(/\s+/g, ' ').trim();
   }
 
-  // Extract Net Profit Margin
-  const npmMatch = html.match(/Net\s+Profit\s+Margin\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
-  if (npmMatch) {
-    f.profitMargin = parseFloat(npmMatch[1]);
+  // Extract sector from page content
+  const sectorMap = {
+    'OIL & GAS EXPLORATION': 'Energy',
+    'OIL & GAS MARKETING': 'Energy',
+    'BANKING': 'Banking',
+    'CEMENT': 'Cement',
+    'FERTILIZER': 'Fertilizer',
+    'POWER': 'Power',
+    'TEXTILE': 'Textile',
+    'TELECOM': 'Telecom',
+    'FOOD & PERSONAL': 'Consumer'
+  };
+
+  for (const [key, value] of Object.entries(sectorMap)) {
+    if (html.includes(key)) {
+      f.sector = value;
+      break;
+    }
   }
 
-  // Extract Gross Profit Margin
-  const gpmMatch = html.match(/Gross\s+Profit\s+Margin\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
-  if (gpmMatch) {
-    f.grossMargin = parseFloat(gpmMatch[1]);
+  // Extract from Financials table - find the row with EPS
+  // Pattern: | 2025 | 242,516,363 | 92,027,450 | 33.82 |
+  const financialsMatch = html.match(/\|\s*(\d{4})\s*\|\s*([\d,]+)\s*\|\s*([\d,]+)\s*\|\s*([\d.]+)\s*\|/);
+  if (financialsMatch) {
+    f.eps = parseFloat(financialsMatch[4]); // EPS is the 4th column
+    f.sales = parseFloat(financialsMatch[2].replace(/,/g, ''));
+    f.profitAfterTax = parseFloat(financialsMatch[3].replace(/,/g, ''));
   }
 
-  // Extract Price/Book
-  const pbMatch = html.match(/Price\/Book\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
-  if (pbMatch) {
-    f.priceToBook = parseFloat(pbMatch[1]);
+  // Try quarterly EPS if annual not found
+  if (!f.eps) {
+    const qMatch = html.match(/Q3\s+2026\s*\|\s*[\d,]+\s*\|\s*[\d,]+\s*\|\s*([\d.]+)\s*\|/);
+    if (qMatch) {
+      f.eps = parseFloat(qMatch[1]);
+      f.isQuarterly = true;
+    }
   }
 
-  // Extract Price/Sales
-  const psMatch = html.match(/Price\/Sales\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
-  if (psMatch) {
-    f.priceToSales = parseFloat(psMatch[1]);
+  // Extract from Ratios table
+  // Pattern: | 2025 | 62.59 | 37.95 | (19.50) | (0.26) |
+  const ratiosMatch = html.match(/\|\s*(\d{4})\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*\(?([\d.()-]+)\)?\s*\|\s*\(?([\d.()-]+)\)?\s*\|/);
+  if (ratiosMatch) {
+    f.grossMargin = parseFloat(ratiosMatch[2]);
+    f.profitMargin = parseFloat(ratiosMatch[3]);
+    f.epsGrowth = parseFloat(ratiosMatch[4].replace(/[()]/g, ''));
+    f.peg = parseFloat(ratiosMatch[5].replace(/[()]/g, ''));
   }
 
-  // Extract ROE
-  const roeMatch = html.match(/Return\s+on\s+Equity\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
-  if (roeMatch) {
-    f.roe = parseFloat(roeMatch[1]);
+  // Extract Market Cap
+  const mcapMatch = html.match(/Market\s+Cap\s*\(000's\)\s*([\d,.]+)/i);
+  if (mcapMatch) {
+    f.marketCap = parseFloat(mcapMatch[1].replace(/,/g, ''));
   }
 
-  // Extract ROA
-  const roaMatch = html.match(/Return\s+on\s+Assets\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
-  if (roaMatch) {
-    f.roa = parseFloat(roaMatch[1]);
+  // Calculate P/E from current price and EPS
+  if (f.eps && currentPrice > 0) {
+    f.pe = currentPrice / f.eps;
   }
 
-  // Extract Current Ratio
-  const crMatch = html.match(/Current\s+Ratio\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
-  if (crMatch) {
-    f.currentRatio = parseFloat(crMatch[1]);
-  }
-
-  // Extract Debt to Equity
-  const deMatch = html.match(/Debt\s+to\s+Equity\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i) ||
-                    html.match(/Long\s+term\s+Debt\s+to\s+Equity\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
-  if (deMatch) {
-    f.debtEq = parseFloat(deMatch[1]);
-  }
-
-  // Extract Book Value per Share
-  const bvpsMatch = html.match(/Book\s+Value\s+per\s+Share\s*<\/td>\s*<td[^>]*>([\d,.]+)<\/td>/i);
+  // Try to extract Book Value per Share from page
+  const bvpsMatch = html.match(/Book\s+Value\s+per\s+Share\s*\(?Rs\.?\)?\s*([\d,.]+)/i);
   if (bvpsMatch) {
     f.bvps = parseFloat(bvpsMatch[1].replace(/,/g, ''));
   }
 
-  // Extract Dividend Yield
-  const dyMatch = html.match(/Dividend\s+Yield\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
-  if (dyMatch) {
-    f.divY = parseFloat(dyMatch[1]);
-  }
-
-  // Extract Dividend per Share
-  const dpsMatch = html.match(/Dividend\s+per\s+Share\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  // Try to extract Dividend per Share
+  const dpsMatch = html.match(/Dividend\s+per\s+Share\s*\(?Rs\.?\)?\s*([\d.]+)/i);
   if (dpsMatch) {
     f.dps = parseFloat(dpsMatch[1]);
+    if (currentPrice > 0) {
+      f.divY = (f.dps / currentPrice) * 100;
+    }
   }
 
-  // Extract company name from title
-  const nameMatch = html.match(/<title>([^<]+)\s+-\s+PSX<\/title>/i) ||
-                    html.match(/Stock\s+quote\s+for\s+([^<]+)/i);
-  if (nameMatch) {
-    f.name = nameMatch[1].trim();
+  // Try to extract ROE
+  const roeMatch = html.match(/Return\s+on\s+Equity\s*([\d.]+)/i);
+  if (roeMatch) {
+    f.roe = parseFloat(roeMatch[1]);
   }
 
-  // Extract sector
-  const sectorMatch = html.match(/sector\/([^"]+)/i) ||
-                      html.match(/Sector:\s*([^<]+)/i);
-  if (sectorMatch) {
-    f.sector = sectorMatch[1].trim();
+  // Try to extract ROA
+  const roaMatch = html.match(/Return\s+on\s+Assets\s*([\d.]+)/i);
+  if (roaMatch) {
+    f.roa = parseFloat(roaMatch[1]);
+  }
+
+  // Try to extract Debt to Equity
+  const deMatch = html.match(/Debt\s+to\s+Equity\s*([\d.]+)/i);
+  if (deMatch) {
+    f.debtEq = parseFloat(deMatch[1]);
+  }
+
+  // Try to extract Current Ratio
+  const crMatch = html.match(/Current\s+Ratio\s*\(?Times\)?\s*([\d.]+)/i);
+  if (crMatch) {
+    f.currentRatio = parseFloat(crMatch[1]);
+  }
+
+  // Try to extract Interest Cover
+  const icMatch = html.match(/Interest\s+Cover\s*\(?Times\)?\s*([\d.]+)/i);
+  if (icMatch) {
+    f.interestCover = parseFloat(icMatch[1]);
+  }
+
+  // Calculate ROE from Profit/Equity if we have the data
+  if (!f.roe && f.profitAfterTax && f.bvps) {
+    // Estimate shares outstanding from market cap / price
+    if (f.marketCap && currentPrice > 0) {
+      const sharesOutstanding = f.marketCap / currentPrice;
+      const totalEquity = f.bvps * sharesOutstanding;
+      f.roe = (f.profitAfterTax / totalEquity) * 100;
+    }
+  }
+
+  // Estimate revenue growth from sales data if available
+  if (f.sales) {
+    const prevSalesMatch = html.match(/\|\s*2024\s*\|\s*([\d,]+)\s*\|/);
+    if (prevSalesMatch) {
+      const prevSales = parseFloat(prevSalesMatch[1].replace(/,/g, ''));
+      if (prevSales > 0) {
+        f.revenueGrowth = ((f.sales - prevSales) / prevSales) * 100;
+      }
+    }
   }
 
   return f;

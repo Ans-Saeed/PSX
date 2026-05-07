@@ -1,372 +1,290 @@
-// ============================================================
-//  PSX API HANDLER  —  api/psx.js  (Vercel Serverless)
-//  Handles:
-//    ?symbol=OGDC          → EOD price timeseries from PSX
-//    ?financials=OGDC      → Real fundamentals scraped from PSX
-//    ?news=true&q=...      → News via RSS feeds (no API key needed)
-// ============================================================
-
 export default async function handler(req, res) {
-  const { symbol, financials, news, q, sector } = req.query;
+  const { symbol, news, q, sector } = req.query;
 
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  if (req.method === "OPTIONS") return res.status(200).end();
 
-  // ─────────────────────────────────────────────
-  //  NEWS ENDPOINT  — RSS via rss2json (no key)
-  // ─────────────────────────────────────────────
-  if (news === "true") {
-    if (!q) return res.status(400).json({ error: "q required" });
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // === NEWS ENDPOINT ===
+  if (news === 'true') {
+    if (!q) {
+      return res.status(400).json({ error: "Query parameter 'q' required for news" });
+    }
 
     try {
-      const feeds = [
-        // Business Recorder — Pakistan's #1 financial daily
-        "https://www.brecorder.com/feeds/markets",
-        // Dawn Business
-        "https://www.dawn.com/feeds/business-finance",
-        // Express Tribune Business
-        "https://tribune.com.pk/feeds/business",
-        // The News Business
-        "https://www.thenews.com.pk/rss/2/8",
-      ];
+      const CURRENTS_API_KEY = process.env.CURRENTS_API_KEY || '';
 
-      // rss2json is free, no key needed, converts RSS → JSON with CORS
-      const RSS2JSON = "https://api.rss2json.com/v1/api.json?rss_url=";
-      const keyword = (q || "").toLowerCase();
-      const sectorKeywords = {
-        Energy: ["oil", "gas", "petroleum", "opec", "energy", "ogdc", "ppl", "mari"],
-        Banking: ["bank", "sbp", "interest rate", "imf", "financial", "hbl", "mcb", "ubl"],
-        Cement: ["cement", "construction", "housing", "coal", "luck", "fccl", "dgkc"],
-        Power: ["power", "electricity", "circular debt", "lesco", "hubco", "kel", "tariff"],
-        Fertilizer: ["fertilizer", "urea", "dap", "engro", "ffbl", "agriculture"],
-        Textile: ["textile", "cotton", "export", "gsp", "yarn", "nml"],
-        Telecom: ["telecom", "ptcl", "5g", "mobile", "internet", "ptc"],
-        Consumer: ["consumer", "food", "inflation", "fmcg", "unity"],
-      };
-      const sectorWords = sectorKeywords[sector] || [];
+      if (CURRENTS_API_KEY) {
+        const searchQueries = [
+          `${q} Pakistan stock`,
+          `${q} PSX`,
+          `${sector || ''} Pakistan economy`
+        ].filter(Boolean);
 
-      const fetchFeed = async (url) => {
-        try {
-          const r = await fetch(`${RSS2JSON}${encodeURIComponent(url)}&count=20`, {
-            headers: { Accept: "application/json" },
+        const newsPromises = searchQueries.map(query => 
+          fetch(`https://api.currentsapi.services/v1/search?keywords=${encodeURIComponent(query)}&language=en&page_size=3`, {
+            headers: { 'Authorization': CURRENTS_API_KEY },
+            timeout: 5000
+          }).then(r => r.ok ? r.json() : null).catch(() => null)
+        );
+
+        const results = await Promise.all(newsPromises);
+
+        const allArticles = [];
+        const seen = new Set();
+
+        results.forEach(result => {
+          if (result?.news) {
+            result.news.forEach(article => {
+              if (!seen.has(article.id)) {
+                seen.add(article.id);
+                allArticles.push({
+                  title: article.title,
+                  source: article.author || article.source?.name || 'News Source',
+                  date: article.published,
+                  url: article.url,
+                  description: article.description
+                });
+              }
+            });
+          }
+        });
+
+        if (allArticles.length > 0) {
+          return res.status(200).json({ 
+            articles: allArticles.slice(0, 6),
+            fallback: false 
           });
-          if (!r.ok) return [];
-          const json = await r.json();
-          return json.items || [];
-        } catch {
-          return [];
         }
-      };
-
-      // Fetch all feeds in parallel
-      const allFeeds = await Promise.all(feeds.map(fetchFeed));
-      const allItems = allFeeds.flat();
-
-      // Score & filter articles by relevance
-      const scored = allItems
-        .filter((item) => item.title && item.link)
-        .map((item) => {
-          const text = (item.title + " " + (item.description || "")).toLowerCase();
-          let score = 0;
-          if (text.includes(keyword)) score += 3;
-          sectorWords.forEach((w) => { if (text.includes(w)) score += 1; });
-          return { ...item, _score: score };
-        })
-        .filter((item) => item._score > 0)
-        .sort((a, b) => {
-          // Sort by score then recency
-          if (b._score !== a._score) return b._score - a._score;
-          return new Date(b.pubDate) - new Date(a.pubDate);
-        })
-        .slice(0, 6);
-
-      // If fewer than 3 relevant articles found, fill with general financial news
-      let articles = scored;
-      if (articles.length < 3) {
-        const general = allItems
-          .filter((item) => item.title && item.link)
-          .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
-          .slice(0, 6 - articles.length);
-        articles = [...articles, ...general];
       }
 
-      const mapped = articles.map((item) => ({
-        title: item.title?.trim(),
-        source: item.author || extractDomain(item.link),
-        date: item.pubDate || new Date().toISOString(),
-        url: item.link,
-        description: stripHtml(item.description || "").slice(0, 160),
-      }));
+      return res.status(200).json({ 
+        articles: generateFallbackNews(q, sector),
+        fallback: true 
+      });
 
-      return res.status(200).json({ articles: mapped, fallback: false });
-    } catch (err) {
-      return res.status(200).json({
+    } catch (error) {
+      return res.status(200).json({ 
         articles: generateFallbackNews(q, sector),
         fallback: true,
-        error: err.message,
+        error: error.message 
       });
     }
   }
 
-  // ─────────────────────────────────────────────
-  //  FINANCIALS ENDPOINT  — scrape PSX financial portal
-  //  Returns: eps, bvps, roe, debtEq, profitMargin, revenueGrowth, divY, pe
-  // ─────────────────────────────────────────────
-  if (financials) {
-    const sym = (financials || "").toUpperCase().trim();
-    if (!sym) return res.status(400).json({ error: "Symbol required" });
+  // === PSX DATA + FUNDAMENTALS ENDPOINT ===
+  if (!symbol) {
+    return res.status(400).json({ error: "Symbol required" });
+  }
 
+  try {
+    // Fetch EOD price data
+    const priceRes = await fetch(
+      `https://dps.psx.com.pk/timeseries/eod/${symbol}`,
+      { headers: { 'Accept': 'application/json' }, timeout: 15000 }
+    );
+
+    if (!priceRes.ok) {
+      throw new Error(`PSX API returned ${priceRes.status}`);
+    }
+
+    const priceData = await priceRes.json();
+
+    // Fetch company page for fundamentals (HTML scraping)
+    let fundamentals = null;
     try {
-      // PSX financial data — annual results page
-      // PSX exposes JSON at this endpoint for annual financial summaries
-      const [annualRes, companyRes] = await Promise.all([
-        fetch(`https://financials.psx.com.pk/financials/annual/${sym}`, {
-          headers: {
-            Accept: "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-            Referer: "https://financials.psx.com.pk/",
-            "User-Agent": "Mozilla/5.0",
-          },
-        }),
-        fetch(`https://dps.psx.com.pk/company/${sym}`, {
-          headers: {
-            Accept: "application/json",
-            "User-Agent": "Mozilla/5.0",
-          },
-        }),
-      ]);
-
-      let annualData = null;
-      let companyData = null;
-
-      if (annualRes.ok) {
-        try { annualData = await annualRes.json(); } catch {}
-      }
-      if (companyRes.ok) {
-        try { companyData = await companyRes.json(); } catch {}
-      }
-
-      // Parse PSX annual financials if available
-      if (annualData && annualData.data && annualData.data.length > 0) {
-        const latest = annualData.data[0]; // Most recent year
-        const prev = annualData.data[1];   // Previous year for growth calc
-
-        // PSX returns values in PKR thousands typically
-        const eps = parseFloat(latest.eps) || null;
-        const bvps = parseFloat(latest.bvps) || null;
-        const roe = parseFloat(latest.roe) || null;
-        const debtEq = parseFloat(latest.debt_equity) || null;
-        const profitMargin = parseFloat(latest.profit_margin) || null;
-        const divPerShare = parseFloat(latest.dividend_per_share) || 0;
-
-        // Calculate revenue growth if prev year available
-        let revenueGrowth = null;
-        if (prev && latest.revenue && prev.revenue) {
-          const r1 = parseFloat(latest.revenue);
-          const r2 = parseFloat(prev.revenue);
-          if (r1 && r2) revenueGrowth = ((r1 - r2) / Math.abs(r2)) * 100;
-        }
-
-        // Get current price from EOD to calculate div yield and P/E
-        const priceRes = await fetch(`https://dps.psx.com.pk/timeseries/eod/${sym}?limit=1`, {
-          headers: { Accept: "application/json" },
-        });
-        let currentPrice = null;
-        if (priceRes.ok) {
-          const priceData = await priceRes.json();
-          if (priceData?.data?.[0]) currentPrice = priceData.data[0][1];
-        }
-
-        const pe = eps && currentPrice ? currentPrice / eps : null;
-        const divY = divPerShare && currentPrice ? (divPerShare / currentPrice) * 100 : 0;
-
-        // Historical P/E for context (last 3 years)
-        const historicalPE = annualData.data
-          .slice(0, 4)
-          .map((d, i) => {
-            const ep = parseFloat(d.eps);
-            // Approximate price at that time using growth
-            return ep ? { year: new Date().getFullYear() - i, eps: ep } : null;
-          })
-          .filter(Boolean);
-
-        return res.status(200).json({
-          symbol: sym,
-          eps,
-          bvps,
-          roe,
-          debtEq,
-          profitMargin,
-          revenueGrowth,
-          divY,
-          pe,
-          historicalPE,
-          source: "psx_financial_portal",
-          lastUpdated: latest.year || "Latest",
-        });
-      }
-
-      // Fallback: try scraping the HTML page for key metrics
-      const htmlRes = await fetch(
-        `https://financials.psx.com.pk/companies/${sym.toLowerCase()}/financials`,
-        {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            Accept: "text/html",
-          },
-        }
-      );
-
-      if (htmlRes.ok) {
-        const html = await htmlRes.text();
-        const extracted = parseFinancialHTML(html);
-        if (extracted && Object.keys(extracted).length > 0) {
-          return res.status(200).json({ symbol: sym, ...extracted, source: "psx_html_scrape" });
-        }
-      }
-
-      // If PSX portal fails, compute from EOD timeseries what we can
-      // (dividends are often in the company description, EPS can be estimated from price + declared P/E)
-      const eodRes = await fetch(`https://dps.psx.com.pk/timeseries/eod/${sym}`, {
-        headers: { Accept: "application/json" },
+      const companyRes = await fetch(`https://dps.psx.com.pk/company/${symbol}`, {
+        headers: { 'Accept': 'text/html' },
+        timeout: 10000
       });
 
-      if (eodRes.ok) {
-        const eodData = await eodRes.json();
-        if (eodData?.data?.length > 0) {
-          // We can compute technical stats but not fundamentals from EOD alone
-          // Return a signal that data is not available so frontend shows "N/A"
-          return res.status(200).json({
-            symbol: sym,
-            source: "eod_only_no_financials",
-            note: "Fundamental data not available from PSX API for this symbol",
-          });
-        }
+      if (companyRes.ok) {
+        const html = await companyRes.text();
+        fundamentals = scrapeFundamentals(html, symbol);
       }
-
-      return res.status(404).json({ error: "No financial data found for " + sym });
-    } catch (err) {
-      console.error("Financials fetch error:", err);
-      return res.status(500).json({ error: err.message });
+    } catch (e) {
+      console.log('Fundamentals scrape failed:', e.message);
     }
-  }
 
-  // ─────────────────────────────────────────────
-  //  EOD PRICE ENDPOINT
-  // ─────────────────────────────────────────────
-  if (!symbol) return res.status(400).json({ error: "Symbol required" });
-
-  try {
-    const response = await fetch(`https://dps.psx.com.pk/timeseries/eod/${symbol}`, {
-      headers: { Accept: "application/json" },
+    res.status(200).json({
+      ...priceData,
+      fundamentals
     });
-    if (!response.ok) throw new Error(`PSX API returned ${response.status}`);
-    const data = await response.json();
-    res.status(200).json(data);
-  } catch (err) {
-    console.error("PSX fetch error:", err);
-    res.status(500).json({ error: err.message || "PSX fetch failed" });
+
+  } catch (error) {
+    console.error("PSX fetch error:", error);
+    res.status(500).json({ error: error.message || "PSX fetch failed" });
   }
 }
 
-// ─────────────────────────────────────────────
-//  HELPERS
-// ─────────────────────────────────────────────
+// Scrape fundamentals from PSX company page HTML
+function scrapeFundamentals(html, symbol) {
+  const f = {};
 
-function extractDomain(url) {
-  try {
-    const host = new URL(url).hostname.replace("www.", "");
-    const known = {
-      "brecorder.com": "Business Recorder",
-      "dawn.com": "Dawn",
-      "tribune.com.pk": "Express Tribune",
-      "thenews.com.pk": "The News",
-      "geo.tv": "Geo News",
-      "arynews.tv": "ARY News",
-      "samaa.tv": "Samaa",
-      "nation.com.pk": "The Nation",
-    };
-    return known[host] || host;
-  } catch {
-    return "News";
+  // Extract EPS from financial tables
+  const epsMatch = html.match(/EPS\s*<\/td>\s*<td[^>]*>([\d,.]+)<\/td>/i) ||
+                   html.match(/Earnings\s+per\s+Share\s*<\/td>\s*<td[^>]*>([\d,.]+)<\/td>/i);
+  if (epsMatch) {
+    f.eps = parseFloat(epsMatch[1].replace(/,/g, ''));
   }
+
+  // Extract Net Profit Margin
+  const npmMatch = html.match(/Net\s+Profit\s+Margin\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (npmMatch) {
+    f.profitMargin = parseFloat(npmMatch[1]);
+  }
+
+  // Extract Gross Profit Margin
+  const gpmMatch = html.match(/Gross\s+Profit\s+Margin\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (gpmMatch) {
+    f.grossMargin = parseFloat(gpmMatch[1]);
+  }
+
+  // Extract Price/Book
+  const pbMatch = html.match(/Price\/Book\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (pbMatch) {
+    f.priceToBook = parseFloat(pbMatch[1]);
+  }
+
+  // Extract Price/Sales
+  const psMatch = html.match(/Price\/Sales\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (psMatch) {
+    f.priceToSales = parseFloat(psMatch[1]);
+  }
+
+  // Extract ROE
+  const roeMatch = html.match(/Return\s+on\s+Equity\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (roeMatch) {
+    f.roe = parseFloat(roeMatch[1]);
+  }
+
+  // Extract ROA
+  const roaMatch = html.match(/Return\s+on\s+Assets\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (roaMatch) {
+    f.roa = parseFloat(roaMatch[1]);
+  }
+
+  // Extract Current Ratio
+  const crMatch = html.match(/Current\s+Ratio\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (crMatch) {
+    f.currentRatio = parseFloat(crMatch[1]);
+  }
+
+  // Extract Debt to Equity
+  const deMatch = html.match(/Debt\s+to\s+Equity\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i) ||
+                    html.match(/Long\s+term\s+Debt\s+to\s+Equity\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (deMatch) {
+    f.debtEq = parseFloat(deMatch[1]);
+  }
+
+  // Extract Book Value per Share
+  const bvpsMatch = html.match(/Book\s+Value\s+per\s+Share\s*<\/td>\s*<td[^>]*>([\d,.]+)<\/td>/i);
+  if (bvpsMatch) {
+    f.bvps = parseFloat(bvpsMatch[1].replace(/,/g, ''));
+  }
+
+  // Extract Dividend Yield
+  const dyMatch = html.match(/Dividend\s+Yield\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (dyMatch) {
+    f.divY = parseFloat(dyMatch[1]);
+  }
+
+  // Extract Dividend per Share
+  const dpsMatch = html.match(/Dividend\s+per\s+Share\s*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/i);
+  if (dpsMatch) {
+    f.dps = parseFloat(dpsMatch[1]);
+  }
+
+  // Extract company name from title
+  const nameMatch = html.match(/<title>([^<]+)\s+-\s+PSX<\/title>/i) ||
+                    html.match(/Stock\s+quote\s+for\s+([^<]+)/i);
+  if (nameMatch) {
+    f.name = nameMatch[1].trim();
+  }
+
+  // Extract sector
+  const sectorMatch = html.match(/sector\/([^"]+)/i) ||
+                      html.match(/Sector:\s*([^<]+)/i);
+  if (sectorMatch) {
+    f.sector = sectorMatch[1].trim();
+  }
+
+  return f;
 }
 
-function stripHtml(html) {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// Attempt to parse key metrics from PSX HTML financial pages
-function parseFinancialHTML(html) {
-  const result = {};
-  const patterns = [
-    { key: "eps", regex: /EPS[^<]*<[^>]+>[\s]*PKR?\s*([\d.]+)/i },
-    { key: "bvps", regex: /Book Value Per Share[^<]*<[^>]+>[\s]*PKR?\s*([\d.]+)/i },
-    { key: "roe", regex: /Return on Equity[^<]*<[^>]+>[\s]*([\d.]+)/i },
-    { key: "profitMargin", regex: /Net Profit Margin[^<]*<[^>]+>[\s]*([\d.]+)/i },
-  ];
-  patterns.forEach(({ key, regex }) => {
-    const m = html.match(regex);
-    if (m) result[key] = parseFloat(m[1]);
-  });
-  return result;
-}
-
-// Fallback news when all RSS sources fail
 function generateFallbackNews(symbol, sector) {
   const today = new Date().toISOString();
   const sectorNews = {
     Energy: [
-      { title: "Oil prices steady amid OPEC+ supply management — Dawn Business", source: "Dawn", date: today, url: "https://dawn.com/business-finance" },
-      { title: "Pakistan petroleum sector mulls exploration incentives — Business Recorder", source: "Business Recorder", date: today, url: "https://brecorder.com" },
-      { title: "SBP monetary policy outlook affects energy company valuations — Express Tribune", source: "Express Tribune", date: today, url: "https://tribune.com.pk/business" },
+      { title: "Global oil prices fluctuate amid Middle East tensions", source: "Reuters", date: today },
+      { title: "Pakistan explores new gas reserves in Sindh", source: "Dawn", date: today },
+      { title: "OPEC+ maintains production cuts, crude stabilizes", source: "Bloomberg", date: today },
+      { title: "Middle East conflict raises supply disruption fears", source: "Al Jazeera", date: today },
+      { title: "US shale production hits record highs", source: "Financial Times", date: today },
+      { title: "Iran nuclear talks affect regional oil outlook", source: "Reuters", date: today }
     ],
     Banking: [
-      { title: "SBP likely to cut policy rate further amid inflation drop — Business Recorder", source: "Business Recorder", date: today, url: "https://brecorder.com" },
-      { title: "Pakistan banks post record profits on high interest margins — Dawn", source: "Dawn", date: today, url: "https://dawn.com/business-finance" },
-      { title: "IMF review on track, banking sector reform progresses — Express Tribune", source: "Express Tribune", date: today, url: "https://tribune.com.pk/business" },
+      { title: "SBP holds policy rate steady at 12%", source: "Express Tribune", date: today },
+      { title: "Pakistan banking sector sees 15% profit growth", source: "Business Recorder", date: today },
+      { title: "Digital banking transformation accelerates in Pakistan", source: "The News", date: today },
+      { title: "IMF review prompts banking sector reforms", source: "Dawn", date: today },
+      { title: "Islamic banking assets cross Rs5 trillion", source: "The Nation", date: today },
+      { title: "Fintech partnerships reshape banking landscape", source: "Bloomberg", date: today }
     ],
     Cement: [
-      { title: "Cement dispatches rise on construction demand — Business Recorder", source: "Business Recorder", date: today, url: "https://brecorder.com" },
-      { title: "Coal cost pressures ease for cement manufacturers — Dawn", source: "Dawn", date: today, url: "https://dawn.com/business-finance" },
-      { title: "Government infrastructure spending to lift cement volumes — Express Tribune", source: "Express Tribune", date: today, url: "https://tribune.com.pk/business" },
+      { title: "Construction activity picks up ahead of budget", source: "Dawn", date: today },
+      { title: "Coal prices impact cement sector margins", source: "Business Recorder", date: today },
+      { title: "Housing sector stimulus expected in new budget", source: "The Nation", date: today },
+      { title: "China slowdown affects cement exports", source: "Reuters", date: today },
+      { title: "Diamer Bhasha Dam boosts cement demand", source: "Express Tribune", date: today },
+      { title: "Cement exports to Afghanistan resume", source: "Dawn", date: today }
     ],
     Power: [
-      { title: "Power sector circular debt approaches Rs3 trillion — Dawn", source: "Dawn", date: today, url: "https://dawn.com/business-finance" },
-      { title: "NEPRA approves tariff revision for independent power producers — Business Recorder", source: "Business Recorder", date: today, url: "https://brecorder.com" },
-      { title: "Renewable energy capacity addition picks up pace — Express Tribune", source: "Express Tribune", date: today, url: "https://tribune.com.pk/business" },
+      { title: "Circular debt crosses Rs2.9 trillion mark", source: "Dawn", date: today },
+      { title: "New solar projects approved under renewable policy", source: "Express Tribune", date: today },
+      { title: "Power tariff hike expected next quarter", source: "The News", date: today },
+      { title: "LNG supply crunch affects power generation", source: "Business Recorder", date: today },
+      { title: "China offers $10bn for renewable energy projects", source: "Bloomberg", date: today },
+      { title: "Nuclear power expansion plans approved", source: "Dawn", date: today }
     ],
     Fertilizer: [
-      { title: "Urea offtake improves ahead of rabi sowing season — Business Recorder", source: "Business Recorder", date: today, url: "https://brecorder.com" },
-      { title: "Gas supply constraints still affecting fertilizer plants — Dawn", source: "Dawn", date: today, url: "https://dawn.com/business-finance" },
-      { title: "Global fertilizer prices stabilise, benefiting Pakistan producers — Express Tribune", source: "Express Tribune", date: today, url: "https://tribune.com.pk/business" },
+      { title: "Kharif season drives urea demand", source: "Business Recorder", date: today },
+      { title: "Gas supply issues persist for fertilizer plants", source: "Dawn", date: today },
+      { title: "Government considers fertilizer subsidy extension", source: "The Nation", date: today },
+      { title: "Global urea prices surge on supply cuts", source: "Reuters", date: today },
+      { title: "India bans fertilizer exports, Pakistan benefits", source: "Financial Times", date: today },
+      { title: "DAP imports increase ahead of sowing season", source: "Business Recorder", date: today }
     ],
     Textile: [
-      { title: "Textile exports grow on EU GSP+ advantage — Business Recorder", source: "Business Recorder", date: today, url: "https://brecorder.com" },
-      { title: "Energy costs remain key challenge for textile sector — Dawn", source: "Dawn", date: today, url: "https://dawn.com/business-finance" },
-      { title: "Cotton crop outlook influences sector sentiment — Express Tribune", source: "Express Tribune", date: today, url: "https://tribune.com.pk/business" },
+      { title: "EU GSP+ status boosts textile exports", source: "Dawn", date: today },
+      { title: "Cotton prices rise on global supply concerns", source: "Business Recorder", date: today },
+      { title: "Energy costs hurt textile competitiveness", source: "The News", date: today },
+      { title: "Bangladesh crisis shifts orders to Pakistan", source: "Reuters", date: today },
+      { title: "Sustainable fashion trend opens new markets", source: "Financial Times", date: today },
+      { title: "Textile machinery imports surge", source: "Business Recorder", date: today }
     ],
     Telecom: [
-      { title: "5G spectrum auction preparation underway at PTA — Dawn", source: "Dawn", date: today, url: "https://dawn.com/business-finance" },
-      { title: "Mobile broadband subscribers cross 130 million mark — Business Recorder", source: "Business Recorder", date: today, url: "https://brecorder.com" },
-      { title: "Telecom revenue growth driven by data services — Express Tribune", source: "Express Tribune", date: today, url: "https://tribune.com.pk/business" },
+      { title: "5G spectrum auction delayed again", source: "Dawn", date: today },
+      { title: "Mobile data usage grows 40% YoY", source: "Express Tribune", date: today },
+      { title: "Regulator slashes interconnection charges", source: "The News", date: today },
+      { title: "Starlink negotiations with Pakistan continue", source: "Bloomberg", date: today },
+      { title: "Fiber optic expansion reaches rural areas", source: "Business Recorder", date: today },
+      { title: "Satellite internet license applications rise", source: "Dawn", date: today }
     ],
     Consumer: [
-      { title: "Inflation eases to single digits, consumer confidence improves — Dawn", source: "Dawn", date: today, url: "https://dawn.com/business-finance" },
-      { title: "FMCG companies report volume recovery in Q3 — Business Recorder", source: "Business Recorder", date: today, url: "https://brecorder.com" },
-      { title: "Edible oil prices decline on global supply surplus — Express Tribune", source: "Express Tribune", date: today, url: "https://tribune.com.pk/business" },
-    ],
+      { title: "Inflation slows to 8-year low", source: "Dawn", date: today },
+      { title: "Consumer spending rebounds in urban centers", source: "Express Tribune", date: today },
+      { title: "Edible oil prices drop on global surplus", source: "Business Recorder", date: today },
+      { title: "Pakistan food exports to Middle East surge", source: "The Nation", date: today },
+      { title: "Ramadan drives seasonal demand spike", source: "The News", date: today },
+      { title: "Modern trade expansion in tier-2 cities", source: "Bloomberg", date: today }
+    ]
   };
-  return (sectorNews[sector] || sectorNews.Energy).map((n) => ({
+  return (sectorNews[sector] || sectorNews.Energy).map(n => ({
     ...n,
-    description: n.title,
+    description: n.title
   }));
 }
